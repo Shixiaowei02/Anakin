@@ -525,6 +525,11 @@ def Parser_flatten(args):
     OpsRegister()["Flatten"].start_axis = helper.attr_data(op, 'axis')
     OpsRegister()["Flatten"].end_axis = -1
 
+@ParserFeedDecorator("PixelShuffle")
+def Parser_pixel_shuffle(args):
+    private_data = args[4]
+    OpsRegister()["PixelShuffle"].upscale_factor = private_data['factor']
+
 @ParserFeedDecorator("assign_value")
 def Parser_assign_value(args):
     pass
@@ -600,4 +605,5 @@ FLUID_NODE_FILLER = {
     "split":OpsParam().set_parser(Parser_slice),
     "fake_quantize_abs_max":OpsParam().set_parser(Parser_fake_quantize_abs_max),
     "fake_dequantize_max_abs":OpsParam().set_parser(Parser_fake_dequantize_max_abs),
+    "pixel_shuffle":OpsParam().set_parser(Parser_pixel_shuffle),
 }

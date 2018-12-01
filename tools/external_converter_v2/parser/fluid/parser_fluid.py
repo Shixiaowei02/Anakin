@@ -437,7 +437,9 @@ class FluidParser:
             if source_op.type == 'elementwise_mul':
                 mul_node_name = self._NameNodeMid(source_op)
                 out_targets = self.outs[mul_node_name]()
-                if len(out_targets) == 1 and out_targets[0].startswith('elementwise_add'):
+                if len(out_targets) == 1 and out_targets[0].startswith('elementwise_add') and \
+                helper.is_persistable_param(source_op, 'Y') and \
+                helper.is_persistable_param(source_op, 'X'):
                     add_node_name = out_targets[0]
                     self._RmProtoNode(add_node_name)
                     a_node_name = self.ins[mul_node_name].target('Y')
@@ -452,6 +454,8 @@ class FluidParser:
                     self.ins[add_node_name].add('Y', y_node_name)
                     self._RmProtoNode(mul_node_name)
                     self._AddProtoNode(add_node_name, None, helper, {}, 'axpy')
+                else:
+                    print 'hello!!!'
 
     def _DealWithPriorBox(self, source_ops, helper, is_dev_v2=True):
         nodes_to_del = []
@@ -877,6 +881,36 @@ class FluidParser:
                 self._RmProtoNode(sm_node_name)
                 self._AddProtoNode(sm_node_name, source_op, helper, private_data, 'softmax')
 
+    def _DealWithPixelShuffle(self, source_ops, helper):
+        for source_op in source_ops:
+            if source_op.type == 'transpose2':
+                axis = helper.attr_data(source_op, 'axis')
+                if axis == [0, 1, 4, 2, 5, 3]:
+                    private_data = dict()
+                    ts_node_name = self._NameNodeMid(source_op)
+                    in_of_transpose = self.ins[ts_node_name].target('X')
+                    out_of_transpose = self.outs[ts_node_name].target('Out')
+                    if in_of_transpose.startswith('reshape') and \
+                    out_of_transpose.startswith('reshape'):
+                        in_reshape_op = self._GetOp(source_ops, in_of_transpose)
+                        out_reshape_op = self._GetOp(source_ops, out_of_transpose)
+                        in_shape = helper.attr_data(in_reshape_op, 'shape')
+                        out_shape = helper.attr_data(out_reshape_op, 'shape')
+                        private_data['factor'] = out_shape[-1] / in_shape[-1]
+                        in_first_reshape = self.ins[in_of_transpose].target('X')
+                        out_last_reshape = self.outs[out_of_transpose].target('Out')
+                        self.outs[in_first_reshape].mv(in_of_transpose, ts_node_name)
+                        self.outs[ts_node_name].mv(out_of_transpose, out_last_reshape)
+                        self.ins[out_last_reshape].mv(out_of_transpose, ts_node_name)
+                        self.ins[ts_node_name].mv(in_of_transpose, in_first_reshape)
+                        self._RmProtoNode(in_of_transpose)
+                        self._RmProtoNode(out_of_transpose)
+                        self._ClearEdges(in_of_transpose)
+                        self._ClearEdges(out_of_transpose)
+                        self._RmProtoNode(ts_node_name)
+                        self._AddProtoNode(ts_node_name, None, helper, \
+                            private_data, 'pixel_shuffle')
+
     def _DealWithFakeQuantize(self, source_ops, helper):
         for source_op in source_ops:
             if source_op.type in ['fake_quantize_abs_max', 'fake_dequantize_max_abs']:
@@ -933,6 +967,7 @@ class FluidParser:
             self._DealWithMultiFC(source_ops, helper)
             self._DealWithArgmax(source_ops, helper)
             self._DealWithAxpy(source_ops, helper)
+            self._DealWithPixelShuffle(source_ops, helper)
             if self.NetType == "SSD":
                 self._DealWithPriorBox(source_ops, helper)
                 self._DealWithDetectionOutput(source_ops, helper)
