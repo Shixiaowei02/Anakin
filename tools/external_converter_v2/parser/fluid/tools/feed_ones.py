@@ -131,15 +131,14 @@ def fluid_inference_test(model_path):
         feed_target_names, 
         fetch_targets] = load_inference_model(model_path, exe)
         global_block = net_program.global_block()
-        print global_block
-        #draw(global_block)
-        #feed_list = feed_ones(global_block, feed_target_names)
-        #fetch_targets = fetch_tmp_vars(global_block, fetch_targets, [GLB_arg_name])
-        #results = exe.run(program=net_program,
-        #                  feed=feed_list,
-        #                  fetch_list=fetch_targets,
-        #                  return_numpy=False)
-        #print_results(results, fetch_targets)
+        draw(global_block)
+        feed_list = feed_ones(global_block, feed_target_names)
+        fetch_targets = fetch_tmp_vars(global_block, fetch_targets, [GLB_arg_name])
+        results = exe.run(program=net_program,
+                          feed=feed_list,
+                          fetch_list=fetch_targets,
+                          return_numpy=False)
+        print_results(results, fetch_targets)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
