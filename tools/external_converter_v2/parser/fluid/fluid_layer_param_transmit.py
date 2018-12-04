@@ -552,6 +552,43 @@ def Parser_fake_dequantize_max_abs(args):
     """
     pass
 
+@ParserFeedDecorator("AffineChannel")
+def Parser_affine_channel(args):
+    """
+    A placeholder for an empty function.
+    """
+    pass
+
+@ParserFeedDecorator("RoiAlign")
+def Parser_roi_align(args):
+    """
+    A placeholder for an empty function.
+    """
+    pass
+
+@ParserFeedDecorator("AnchorGenerator")
+def Parser_anchor_generator(args):
+    op = args[1]
+    helper = args[3]
+    OpsRegister()["AnchorGenerator"].anchor_sizes = helper.attr_data(op, 'anchor_sizes')
+    OpsRegister()["AnchorGenerator"].aspect_ratios = helper.attr_data(op, 'aspect_ratios')
+    OpsRegister()["AnchorGenerator"].variances = helper.attr_data(op, 'variances')
+    OpsRegister()["AnchorGenerator"].stride = helper.attr_data(op, 'stride')
+    OpsRegister()["AnchorGenerator"].offset = helper.attr_data(op, 'offset')
+
+
+@ParserFeedDecorator("GenerateProposals")
+def Parser_generate_proposals(args):
+    op = args[1]
+    helper = args[3]
+    OpsRegister()["GenerateProposals"].pre_nms_top_n = helper.attr_data(op, 'pre_nms_topN')
+    OpsRegister()["GenerateProposals"].post_nms_top_n = helper.attr_data(op, 'post_nms_topN')
+    OpsRegister()["GenerateProposals"].nms_thresh = helper.attr_data(op, 'nms_thresh')
+    OpsRegister()["GenerateProposals"].min_size = helper.attr_data(op, 'min_size')
+    OpsRegister()["GenerateProposals"].eta = helper.attr_data(op, 'eta')
+
+
+
 FLUID_NODE_FILLER = {
     "feed":OpsParam().set_parser(Parser_feed),
     "conv2d":OpsParam().set_parser(Parser_conv2d),
@@ -606,4 +643,10 @@ FLUID_NODE_FILLER = {
     "fake_quantize_abs_max":OpsParam().set_parser(Parser_fake_quantize_abs_max),
     "fake_dequantize_max_abs":OpsParam().set_parser(Parser_fake_dequantize_max_abs),
     "pixel_shuffle":OpsParam().set_parser(Parser_pixel_shuffle),
+    # FastRCNN start
+    "affine_channel":OpsParam().set_parser(Parser_affine_channel),
+    "anchor_generator":OpsParam().set_parser(Parser_anchor_generator),
+    "generate_proposals":OpsParam().set_parser(Parser_generate_proposals),
+    "roi_align":OpsParam().set_parser(Parser_roi_align),
+    # FastRCNN end
 }
