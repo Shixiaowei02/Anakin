@@ -576,6 +576,7 @@ def Parser_roi_align(args):
     OpsRegister()["RoiAlign"].spatial_scale = helper.attr_data(op, 'spatial_scale')
     OpsRegister()["RoiAlign"].pooled_height = helper.attr_data(op, 'pooled_height')
     OpsRegister()["RoiAlign"].pooled_width = helper.attr_data(op, 'pooled_width')
+    OpsRegister()["RoiAlign"].sampling_ratio = helper.attr_data(op, 'sampling_ratio')
 
 @ParserFeedDecorator("AnchorGenerator")
 def Parser_anchor_generator(args):
