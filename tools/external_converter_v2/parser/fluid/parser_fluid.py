@@ -883,7 +883,7 @@ class FluidParser:
 
     def _DealWithPixelShuffle(self, source_ops, helper):
         for source_op in source_ops:
-            if source_op.type == 'transpose2':
+            if source_op.type in ['transpose', 'transpose2']:
                 axis = helper.attr_data(source_op, 'axis')
                 if axis == [0, 1, 4, 2, 5, 3]:
                     private_data = dict()
@@ -910,6 +910,36 @@ class FluidParser:
                         self._RmProtoNode(ts_node_name)
                         self._AddProtoNode(ts_node_name, None, helper, \
                             private_data, 'pixel_shuffle')
+
+    def _DealWithShuffleChannel(self, source_ops, helper):
+        for source_op in source_ops:
+            if source_op.type in ['transpose', 'transpose2']:
+                axis = helper.attr_data(source_op, 'axis')
+                if axis == [0, 2, 1, 3, 4]:
+                    private_data = dict()
+                    ts_node_name = self._NameNodeMid(source_op)
+                    in_of_transpose = self.ins[ts_node_name].target('X')
+                    out_of_transpose = self.outs[ts_node_name].target('Out')
+                    if in_of_transpose.startswith('reshape') and \
+                    out_of_transpose.startswith('reshape'):
+                        in_reshape_op = self._GetOp(source_ops, in_of_transpose)
+                        out_reshape_op = self._GetOp(source_ops, out_of_transpose)
+                        in_shape = helper.attr_data(in_reshape_op, 'shape')
+                        out_shape = helper.attr_data(out_reshape_op, 'shape')
+                        private_data['group'] = out_shape[-3] / in_shape[-3]
+                        in_first_reshape = self.ins[in_of_transpose].target('X')
+                        out_last_reshape = self.outs[out_of_transpose].target('Out')
+                        self.outs[in_first_reshape].mv(in_of_transpose, ts_node_name)
+                        self.outs[ts_node_name].mv(out_of_transpose, out_last_reshape)
+                        self.ins[out_last_reshape].mv(out_of_transpose, ts_node_name)
+                        self.ins[ts_node_name].mv(in_of_transpose, in_first_reshape)
+                        self._RmProtoNode(in_of_transpose)
+                        self._RmProtoNode(out_of_transpose)
+                        self._ClearEdges(in_of_transpose)
+                        self._ClearEdges(out_of_transpose)
+                        self._RmProtoNode(ts_node_name)
+                        self._AddProtoNode(ts_node_name, None, helper, \
+                            private_data, 'shuffle_channel')
 
     def _DealWithFakeQuantize(self, source_ops, helper):
         for source_op in source_ops:
@@ -968,6 +998,7 @@ class FluidParser:
             self._DealWithArgmax(source_ops, helper)
             self._DealWithAxpy(source_ops, helper)
             self._DealWithPixelShuffle(source_ops, helper)
+            self._DealWithShuffleChannel(source_ops, helper)
             if self.NetType == "SSD":
                 self._DealWithPriorBox(source_ops, helper)
                 self._DealWithDetectionOutput(source_ops, helper)

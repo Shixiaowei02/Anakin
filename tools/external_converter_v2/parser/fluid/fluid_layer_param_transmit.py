@@ -224,10 +224,14 @@ def Parser_transpose(args):
     op = args[1]
     helper = args[3]
     fluid_dims = helper.attr_data(op, 'axis')
-    n = 4 - len(fluid_dims)
-    dims = range(0, n)
-    tail_dims = [i + n for i in fluid_dims]
-    dims.extend(tail_dims)
+    dims = 0
+    if fluid_dims < 4:
+        n = 4 - len(fluid_dims)
+        dims = range(0, n)
+        tail_dims = [i + n for i in fluid_dims]
+        dims.extend(tail_dims)
+    else:
+        dims = fluid_dims
     OpsRegister()["Permute"].dims = dims
 
 
@@ -552,6 +556,60 @@ def Parser_fake_dequantize_max_abs(args):
     """
     pass
 
+@ParserFeedDecorator("ShuffleChannel")
+def Parser_shuffle_channel(args):
+    private_data = args[4]
+    OpsRegister()["ShuffleChannel"].group = private_data['group']
+
+@ParserFeedDecorator("AffineChannel")
+def Parser_affine_channel(args):
+    op = args[1]
+    helper = args[3]
+    OpsRegister()["AffineChannel"].weight_1 = helper.param_tensor(op, 'Scale')
+    OpsRegister()["AffineChannel"].weight_2 = helper.param_tensor(op, 'Bias')
+
+
+@ParserFeedDecorator("RoiAlign")
+def Parser_roi_align(args):
+    op = args[1]
+    helper = args[3]
+    OpsRegister()["RoiAlign"].spatial_scale = helper.attr_data(op, 'spatial_scale')
+    OpsRegister()["RoiAlign"].pooled_height = helper.attr_data(op, 'pooled_height')
+    OpsRegister()["RoiAlign"].pooled_width = helper.attr_data(op, 'pooled_width')
+    OpsRegister()["RoiAlign"].sampling_ratio = helper.attr_data(op, 'sampling_ratio')
+
+@ParserFeedDecorator("AnchorGenerator")
+def Parser_anchor_generator(args):
+    op = args[1]
+    helper = args[3]
+    OpsRegister()["AnchorGenerator"].anchor_sizes = helper.attr_data(op, 'anchor_sizes')
+    OpsRegister()["AnchorGenerator"].aspect_ratios = helper.attr_data(op, 'aspect_ratios')
+    OpsRegister()["AnchorGenerator"].variances = helper.attr_data(op, 'variances')
+    OpsRegister()["AnchorGenerator"].stride = helper.attr_data(op, 'stride')
+    OpsRegister()["AnchorGenerator"].offset = helper.attr_data(op, 'offset')
+
+
+@ParserFeedDecorator("GenerateProposals")
+def Parser_generate_proposals(args):
+    op = args[1]
+    helper = args[3]
+    OpsRegister()["GenerateProposals"].pre_nms_top_n = helper.attr_data(op, 'pre_nms_topN')
+    OpsRegister()["GenerateProposals"].post_nms_top_n = helper.attr_data(op, 'post_nms_topN')
+    OpsRegister()["GenerateProposals"].nms_thresh = helper.attr_data(op, 'nms_thresh')
+    OpsRegister()["GenerateProposals"].min_size = helper.attr_data(op, 'min_size')
+    OpsRegister()["GenerateProposals"].eta = helper.attr_data(op, 'eta')
+
+@ParserFeedDecorator("Normalize")
+def Parser_norm(args):
+    op = args[1]
+    helper = args[3]
+    OpsRegister()["Normalize"].is_across_spatial = False
+    OpsRegister()["Normalize"].is_shared_channel = False
+    OpsRegister()["Normalize"].eps = helper.attr_data(op, 'epsilon')
+    OpsRegister()["Normalize"].p = 2
+
+
+
 FLUID_NODE_FILLER = {
     "feed":OpsParam().set_parser(Parser_feed),
     "conv2d":OpsParam().set_parser(Parser_conv2d),
@@ -606,4 +664,12 @@ FLUID_NODE_FILLER = {
     "fake_quantize_abs_max":OpsParam().set_parser(Parser_fake_quantize_abs_max),
     "fake_dequantize_max_abs":OpsParam().set_parser(Parser_fake_dequantize_max_abs),
     "pixel_shuffle":OpsParam().set_parser(Parser_pixel_shuffle),
+    "shuffle_channel":OpsParam().set_parser(Parser_shuffle_channel),
+    # FastRCNN start
+    "affine_channel":OpsParam().set_parser(Parser_affine_channel),
+    "anchor_generator":OpsParam().set_parser(Parser_anchor_generator),
+    "generate_proposals":OpsParam().set_parser(Parser_generate_proposals),
+    "roi_align":OpsParam().set_parser(Parser_roi_align),
+    # FastRCNN end
+    "norm":OpsParam().set_parser(Parser_norm),
 }
