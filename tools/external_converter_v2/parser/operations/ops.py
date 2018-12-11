@@ -449,4 +449,4 @@ OpsRegister.Register("SequencePool").set_attr(pooltype = str())  #no paras, no w
 ###### it is named UnpaddingPaddingLayer in lego,
 OpsRegister.Register("ConvUnpaddingPadding").set_attr()  #no paras, no weights.
 
-OpsRegister.Register("PixelShuffle").set_attr(upscale_factor=int())
+OpsRegister.Register("PixelShuffle").set_attr(upscale_factor = int())
