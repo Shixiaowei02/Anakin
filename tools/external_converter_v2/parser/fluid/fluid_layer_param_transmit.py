@@ -203,6 +203,8 @@ def Parser_reshape(args):
         layout = 'NCHW'
     elif len(shape) == 3:
         layout = 'NHW'
+    elif len(shape) == 2:
+        layout = 'NW'
     OpsRegister()["Reshape"].dims = shape
     OpsRegister()["Reshape"].layout = layout
 
