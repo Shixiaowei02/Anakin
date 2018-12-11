@@ -40,17 +40,17 @@
 ##--------------------------------------------------------------
 #
 OPTIONS:
-    Framework: CAFFE
+    Framework: FLUID
     SavePath: ./output
     ResultName: googlenet
     Config:
         LaunchBoard: ON
         Server:
             ip: 0.0.0.0
-            port: 8888
+            port: 8000
         OptimizedGraph:
-            enable: OFF
-            path: /path/to/anakin_optimized/googlenet.anakin.bin.saved
+            enable: ON
+            path: /home/shixiaowei02/github_float_parser/Anakin/tools/external_converter_v2/output/new_gongan.anakin2.bin.saved 
     LOGGER:
         LogToPath: ./log/
         WithColor: ON
@@ -67,7 +67,7 @@ TARGET:
     FLUID:
         # path of fluid inference model
         Debug: NULL                            # Generally no need to modify.
-        ModelPath: /path/to/your/model/        # The upper path of a fluid inference model.
+        ModelPath: /home/shixiaowei02/github_float_parser/Anakin/tools/external_converter_v2/test_model/paddle-transmodel
         NetType:                               # Generally no need to modify.
 
     LEGO:

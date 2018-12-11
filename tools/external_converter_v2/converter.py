@@ -18,8 +18,8 @@ if __name__ == "__main__":
     logger.init(config.logger_dict)
 
     graph = Graph(config)
-    graph.info_table()
-    graph.serialization()
+    #graph.info_table()
+    #graph.serialization()
 
     if config.LaunchBoard:
         launch(config, graph)

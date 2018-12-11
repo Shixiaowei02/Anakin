@@ -112,7 +112,7 @@ def Parser_softmax(args):
     if 'axis' in private_data.keys():
         axis = private_data['axis']
     else:
-        axis = 1
+        axis = 2
     OpsRegister()["Softmax"].axis = axis
 
 @ParserFeedDecorator("Activation")
@@ -194,17 +194,15 @@ def Parser_reshape(args):
     op = args[1]
     helper = args[3]
     private_data = args[4]
-    layout = str()
     if 'new_shape' in private_data.keys():
         shape = private_data['new_shape']
     else:
         shape = helper.attr_data(op, 'shape')
-    if len(shape) == 4:
-        layout = 'NCHW'
-    elif len(shape) == 3:
-        layout = 'NHW'
+        if len(shape) == 3:
+            shape = [1, 1, shape[1], shape[2]]
+        else:
+            shape = map(int, shape + [1] * (4 - len(shape)))
     OpsRegister()["Reshape"].dims = shape
-    OpsRegister()["Reshape"].layout = layout
 
 @ParserFeedDecorator("Concat")
 def Parser_concat(args):
@@ -483,8 +481,9 @@ def Parser_elementwise_mul(args):
         OpsRegister()["Scale"].weight_1 = helper.param_tensor(op, 'Y')
     else:
         OpsRegister()["Scale"].weight_1 = helper.create_tensor([1], [1, 1, 1, 1], FLOAT) # developing
-    OpsRegister()["Scale"].axis = helper.attr_data(op, 'axis')
-    OpsRegister()["Scale"].num_axes = 1
+    #OpsRegister()["Scale"].axis = helper.attr_data(op, 'axis')
+    OpsRegister()["Scale"].axis = 1
+    OpsRegister()["Scale"].num_axes = 0
     if 'bias' in private_data.keys():
         OpsRegister()["Scale"].bias_term = True
         OpsRegister()["Scale"].weight_2 = private_data['bias']
