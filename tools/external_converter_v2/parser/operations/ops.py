@@ -360,7 +360,8 @@ OpsRegister.Register("LayerNorm").set_attr(is_across_spatial=bool(),
                                            begin_norm_axis=int(),
                                            eps=float())
 
-OpsRegister.Register("Resize").set_attr(height_scale=float(),
+OpsRegister.Register("Resize").set_attr(method="BILINEAR_ALIGN",
+                                        height_scale=float(),
                                         width_scale=float())
 
 OpsRegister.Register("Normalize").set_attr(begin_norm_axis=int(),
@@ -448,8 +449,6 @@ OpsRegister.Register("SequencePool").set_attr(pooltype = str())  #no paras, no w
 #####################################Unpadding_padding op define ############################    #########
 ###### it is named UnpaddingPaddingLayer in lego,
 OpsRegister.Register("ConvUnpaddingPadding").set_attr()  #no paras, no weights.
-
-
 # Fast-RCNN
 OpsRegister.Register("AffineChannel").set_attr()  #no paras, no weights.
 
@@ -469,4 +468,3 @@ OpsRegister.Register("RoiAlign").set_attr(spatial_scale=float(),
                                           pooled_height=int(),
                                           pooled_width=int(),
                                           sampling_ratio=int())
-

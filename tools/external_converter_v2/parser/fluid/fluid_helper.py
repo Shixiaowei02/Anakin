@@ -18,22 +18,23 @@ def difference(list_a, list_b):
 
 class Edge_for_fluid:
 
-    def __init__(self, param, target, var):
+    def __init__(self, param, target, var, scale):
         '''
         '''
         self.param = param
         self.target = target
         self.var = var
+        self.scale = scale
 
 
 class Fluid_edger:
 
-    def __init__(self, param = None, target = None, var = None):
+    def __init__(self, param=None, target=None, var=None, scale=None):
         '''
         '''
         self.edges = []
         if param is not None and target is not None:
-            edge = Edge_for_fluid(param, target, var)
+            edge = Edge_for_fluid(param, target, var, scale)
             self.edges.append(edge)
 
     def __call__(self):
@@ -41,10 +42,10 @@ class Fluid_edger:
         '''
         return self.all_targets()
 
-    def add(self, param, target, var = None):
+    def add(self, param, target, var=None, scale=None):
         '''
         '''
-        edge = Edge_for_fluid(param, target, var)
+        edge = Edge_for_fluid(param, target, var, scale)
         self.edges.append(edge)
 
     def rm_edges_by_param(self, param):
@@ -67,16 +68,25 @@ class Fluid_edger:
         if res != 0:
             pass
 
-    def mv(self, old_target, new_target):
+    def mv(self, old_target, new_target, new_scale=None):
         '''
         '''
         res = -1
         for edge in self.edges:
             if old_target == edge.target:
                 edge.target = new_target
+                if new_scale is not None:
+                    edge.scale = new_scale
                 res = res + 1
         if res != 0:
             pass
+
+    def reset_target_by_param(self, param, new_target):
+        '''
+        '''
+        for edge in self.edges:
+            if edge.param == param:
+                edge.target = new_target
 
     def all_params(self):
         '''
@@ -94,6 +104,28 @@ class Fluid_edger:
         for edge in self.edges:
             targets.append(edge.target)
         return targets
+
+    def all_scales(self):
+        '''
+        '''
+        scales = []
+        for edge in self.edges:
+            scales.append(edge.scale)
+        return scales
+
+    def set_scale(self, target, scale):
+        '''
+        '''
+        for edge in self.edges:
+            if edge.target == target:
+                edge.scale = scale
+
+    def get_scale(self, target):
+        '''
+        '''
+        for edge in self.edges:
+            if edge.target == target:
+                return edge.scale
 
     def targets(self, param):
         '''
@@ -362,12 +394,14 @@ class Fluid_helper:
         '''
         '''
         tensor = TensorProtoIO()
-        [flat_data, shape] = self.data_with_shape_by_param(op, param_name, transpose, \
-            axes, var_idx, True, layout)
+        [np_data, shape] = self.data_with_shape_by_param(op, param_name, transpose, \
+            axes, var_idx, False, layout)
         dtype = self.dtype_by_param(op, param_name, var_idx)
         tensor.set_data_type(dtype)
-        if dtype in ANAKIN_TENSOR_DTYPESTR.keys():
-            tensor.set_data(flat_data, ANAKIN_TENSOR_DTYPESTR[dtype])
+        if dtype is INT8:
+            tensor.set_data(np_data.flatten().tobytes(), ANAKIN_TENSOR_DTYPESTR[dtype])
+        elif dtype in ANAKIN_TENSOR_DTYPESTR.keys():
+            tensor.set_data(np_data.flatten().tolist(), ANAKIN_TENSOR_DTYPESTR[dtype])
             #pass #debug
         else:
             raise NameError('ERROR: Unknown data type (%s)' % (dtype))
@@ -391,13 +425,15 @@ class Fluid_helper:
             reshape, var_idx, layout)
         return tensor
 
-    def create_tensor(self, data_list, data_shape, dtype):
+    def create_tensor(self, data_list, data_shape, dtype, scale=None):
         '''
         '''
         tensor = TensorProtoIO()
         tensor.set_data_type(dtype)
         tensor.set_data(data_list, ANAKIN_TENSOR_DTYPESTR[dtype])
         tensor.set_shape(data_shape)
+        if scale is not None:
+            tensor.set_scale(scale)
         return tensor
 
     def gru_tensor_convert(self, origin_h2h, origin_i2h, origin_b, offset=[2, 1, 0]):
@@ -560,6 +596,7 @@ class Fluid_comparator:
 
 
 ANAKIN_TENSOR_DTYPE = {
+    VarDesc.VarType.INT8: INT8,
     VarDesc.VarType.BOOL: BOOLEN,
     VarDesc.VarType.INT32: INT32,
     VarDesc.VarType.FP16: FLOAT16,
@@ -569,9 +606,10 @@ ANAKIN_TENSOR_DTYPE = {
 
 ANAKIN_TENSOR_DTYPESTR = {
     STR: "string",
-    INT32: "int",
+    INT8: "int8",
+    INT32: "int32",
     FLOAT: "float",
-    BOOLEN: "bool",
+    BOOLEN: "bool"
 }
 
 ANAKIN_ATTR_DTYPE = {
@@ -617,3 +655,21 @@ APPEND_ACT_OP_TYPE = [
     'row_conv',
     'reshape',
 ]
+
+FLUID_QUANTIZE_LAYERS = [
+    'fake_quantize_abs_max',
+    'fake_quantize_range_abs_max',
+    'quantize',
+]
+
+FLUID_DEQUANTIZE_LAYERS = [
+    'fake_dequantize_max_abs',
+    'fake_dequantize_range_max_abs',
+    'dequantize',
+]
+
+FLUID_SCALE_WEIGHT_OP = [
+    'conv2d',
+    'depthwise_conv2d',
+]
+

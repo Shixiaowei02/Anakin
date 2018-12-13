@@ -30,10 +30,16 @@ def Parser_feed(args):
 
 @ParserFeedDecorator("Convolution")
 def Parser_conv2d(args):
+    node = args[0]
     op = args[1]
     helper = args[3]
     private_data = args[4]
     [weights_tensor, weights_shape] = helper.param_tensor_sh(op, 'Filter')
+    if 'scale_1' in private_data:
+        node.set_bit_type(INT8)
+        weights_tensor.set_scale(private_data['scale_1'], 'float')
+    else:
+        node.set_bit_type(FLOAT)
     OpsRegister()["Convolution"].weight_1 = weights_tensor
     OpsRegister()["Convolution"].filter_num = weights_shape[0]
     OpsRegister()["Convolution"].kernel_size = weights_shape[-2:]
@@ -50,11 +56,17 @@ def Parser_conv2d(args):
 
 @ParserFeedDecorator("Deconvolution")
 def Parser_conv2d_transpose(args):
+    node = args[0]
     op = args[1]
     helper = args[3]
     private_data = args[4]
     [weights_tensor, weights_shape] = helper.param_tensor_sh(op, 'Filter')
     weights_tensor.set_shape([weights_shape[1], weights_shape[0], weights_shape[2], weights_shape[3]])
+    if 'scale_1' in private_data:
+        node.set_bit_type(INT8)
+        weights_tensor.set_scale(private_data['scale_1'], 'float')
+    else:
+        node.set_bit_type(FLOAT)
     OpsRegister()["Deconvolution"].weight_1 = weights_tensor
     OpsRegister()["Deconvolution"].filter_num = weights_shape[1]
     OpsRegister()["Deconvolution"].kernel_size = weights_shape[-2:]
@@ -184,7 +196,7 @@ def Parser_split_ins(args):
 def Parser_slice(args):
     op = args[1]
     helper = args[3]
-    OpsRegister()["Slice"].slice_point = [-1]
+    OpsRegister()["Slice"].slice_point = []
     OpsRegister()["Slice"].num = helper.attr_data(op, 'num')
     OpsRegister()["Slice"].axis = helper.attr_data(op, 'axis')
     OpsRegister()["Slice"].sections = helper.attr_data(op, 'sections')
@@ -558,6 +570,41 @@ def Parser_fake_dequantize_max_abs(args):
     """
     pass
 
+@ParserFeedDecorator("fake_dequantize_range_max_abs")
+def Parser_fake_dequantize_range_max_abs(args):
+    """
+    A placeholder for an empty function.
+    """
+    pass
+
+@ParserFeedDecorator("fake_quantize_range_abs_max")
+def Parser_fake_quantize_range_abs_max(args):
+    """
+    A placeholder for an empty function.
+    """
+    pass
+
+@ParserFeedDecorator("dequantize")
+def Parser_dequantize(args):
+    """
+    A placeholder for an empty function.
+    """
+    pass
+
+@ParserFeedDecorator("quantize")
+def Parser_quantize(args):
+    """
+    A placeholder for an empty function.
+    """
+    pass
+
+@ParserFeedDecorator("increment")
+def Parser_increment(args):
+    """
+    A placeholder for an empty function.
+    """
+    pass
+
 @ParserFeedDecorator("ShuffleChannel")
 def Parser_shuffle_channel(args):
     private_data = args[4]
@@ -589,8 +636,7 @@ def Parser_anchor_generator(args):
     OpsRegister()["AnchorGenerator"].variances = helper.attr_data(op, 'variances')
     OpsRegister()["AnchorGenerator"].stride = helper.attr_data(op, 'stride')
     OpsRegister()["AnchorGenerator"].offset = helper.attr_data(op, 'offset')
-
-
+    
 @ParserFeedDecorator("GenerateProposals")
 def Parser_generate_proposals(args):
     op = args[1]
@@ -610,6 +656,13 @@ def Parser_norm(args):
     OpsRegister()["Normalize"].eps = helper.attr_data(op, 'epsilon')
     OpsRegister()["Normalize"].p = 2
 
+@ParserFeedDecorator("Resize")
+def Parser_bilinear_interp(args):
+    op = args[1]
+    helper = args[3]
+    OpsRegister()["Resize"].width_scale = helper.attr_data(op, 'out_w')
+    OpsRegister()["Resize"].height_scale = helper.attr_data(op, 'out_h')
+    OpsRegister()["Resize"].method = "BILINEAR_ALIGN"
 
 FLUID_NODE_FILLER = {
     "feed":OpsParam().set_parser(Parser_feed),
@@ -662,8 +715,12 @@ FLUID_NODE_FILLER = {
     "leaky_relu":OpsParam().set_parser(Parser_leaky_relu),
     "prelu":OpsParam().set_parser(Parser_prelu),
     "split":OpsParam().set_parser(Parser_slice),
+    "quantize":OpsParam().set_parser(Parser_quantize),
+    "dequantize":OpsParam().set_parser(Parser_dequantize),
     "fake_quantize_abs_max":OpsParam().set_parser(Parser_fake_quantize_abs_max),
+    "fake_quantize_range_abs_max":OpsParam().set_parser(Parser_fake_quantize_range_abs_max),
     "fake_dequantize_max_abs":OpsParam().set_parser(Parser_fake_dequantize_max_abs),
+    "fake_dequantize_range_max_abs":OpsParam().set_parser(Parser_fake_dequantize_range_max_abs),
     "pixel_shuffle":OpsParam().set_parser(Parser_pixel_shuffle),
     "shuffle_channel":OpsParam().set_parser(Parser_shuffle_channel),
     # FastRCNN start
@@ -673,4 +730,6 @@ FLUID_NODE_FILLER = {
     "roi_align":OpsParam().set_parser(Parser_roi_align),
     # FastRCNN end
     "norm":OpsParam().set_parser(Parser_norm),
+    "increment":OpsParam().set_parser(Parser_increment),
+    "bilinear_interp":OpsParam().set_parser(Parser_bilinear_interp),
 }
