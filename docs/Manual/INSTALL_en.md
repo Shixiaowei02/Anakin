@@ -1,8 +1,8 @@
-# Building Anakin from Source ##
+## Building Anakin from Source ##
 
-We've built and tested Anakin on CentOS 7.3 and Ubuntu 16.04. The other operating systems installation are coming soon.
+We've built and tested Anakin on CentOS 7.3. The other operating systems installation are coming soon.
 
-## Installation overview ##
+### Installation overview ###
 
 * [Installing on CentOS](#0001)
 * [Installing on Ubuntu](#0002)
@@ -10,219 +10,243 @@ We've built and tested Anakin on CentOS 7.3 and Ubuntu 16.04. The other operatin
 * [Verifying installation](#0004)
 
 
-## <span id = '0001'> Installing on CentOS </span> ###
+### <span id = '0001'> Installing on CentOS </span> ###
 
-### 1. System requirements ###
+#### 1. System requirements ####
 
-*  gcc 4.8.5
-*  g++ 4.8.5
 *  make 3.82+
 *  cmake 2.8.12+
-*  protobuf 3.4.0
-*  wget
+*  gcc 4.8.2+
+*  g++ 4.8.2+
 
-1.1 install wget
-```bash
-$ sudo yum -y install wget
-```
-1.2 install protobuf  
-```bash
-$ wget --no-check-certificate https://mirror.sobukus.de/files/src/protobuf/protobuf-cpp-3.4.0.tar.gz
-$ tar -xvf protobuf-cpp-3.4.0.tar.gz
-$ cd protobuf-3.4.0
-$ ./configure
-$ make -j
-$ make install
-```
+#### 2. Building Anakin for CPU-only ####
 
-Check
+Not support yet.
 
-```bash
-$ protoc --version  
-```
+#### 3. Building Anakin with NVIDIA GPU Support ####
 
-  Any problems for protobuf installation, Please see [here](https://github.com/google/protobuf/blob/master/src/README.md)
-### 2. Building Anakin for CPU-only ###
+- 3.1. Install dependences
+ - 3.1.1 protobuf 3.4.0  
+    Download source from https://github.com/google/protobuf/releases/tag/v3.4.0
+    >tar -xzf protobuf-3.4.0.tar.gz  
+    >$ cd protobuf-3.4.0   
+    >$ ./autogen.sh  
+    >$ ./configure    
+    >$ make  
+    >$ make check   
+    >$ make install  
 
-Please make sure that all pre-requirements have been installed on your system.
+   Check  
+    >$ protoc --version
 
-2.1 Clone Anakin and build
+    Any problems for protobuf installation, Please see [here](https://github.com/google/protobuf/blob/master/src/README.md)
 
-```bash
-$ git clone https://github.com/PaddlePaddle/Anakin.git  
-$ cd Anakin 
-$ git checkout developing  
+  - 3.1.2 CUDA Tookit
+     - [CUDA 8.0](https://developer.nvidia.com/cuda-zone) or higher. For details, see [NVIDIA's documentation](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).
+     - [cuDNN v7](https://developer.nvidia.com/cudnn). For details, see [NVIDIA's documentation](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).  
+  When you have installed cuDNN v7, please set the following variable to your `bashrc` 
+     ```bash
+      # CUDNN
+      export CUDNN_ROOT=/usr/local/cudnn_v7 # the path where your cuDNN installed.
+      export LD_LIBRARY_PATH=${CUDNN_ROOT}/lib64:$LD_LIBRARY_PATH
+      export CPLUS_INCLUDE_PATH=${CUDNN_ROOT}/include:$CPLUS_INCLUDE_PATH
+     ```
+          Don't forget to source your bashrc
 
-# tools directory contains multi-platform build scripts.
-
-# 1. using script to build.
-$ ./tools/x86_build.sh
-
-# 2. or you can build directly. This way you can build x86 and gpu  
-# at the same time by set corresponding variables(USE_GPU_PLACE, 
-# USE_X86_PLACE, USE_ARM_PLACE) in CMakeList.txt which is at Anakin 
-# source root directory. In this situation, set USE_X86_PLACE with YES, 
-# others with NO. And then type the following command:
-
-# $ mkdir build  
-# $ cd build  
-# $ cmake ..  
-# $ make
-```
-
-### 3. Building Anakin with NVIDIA GPU Support ###
-
-3.1. Install dependences  
-3.1.1 CUDA Tookit
-- [CUDA 8.0](https://developer.nvidia.com/cuda-zone) or higher. For details, see [NVIDIA's documentation](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).
-- [cuDNN v7](https://developer.nvidia.com/cudnn). For details, see [NVIDIA's documentation](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).  
-  When you have installed cuDNN v7, please set the following variable to your `bashrc`  
-
- ```bash
-#set CUDA path(cuda 9.0 for example)
-export PATH=/usr/local/cuda-9.0/bin:$PATH #the path where your CUDA installed.
-export LD_LIBRARY_PATH=/usr/local/cuda-9.0/lib64:$LD_LIBRARY_PATH
-
-# CUDNN
-$ export CUDNN_ROOT=/usr/local/cudnn_v7 # the path where your cuDNN installed.
-$ export LD_LIBRARY_PATH=${CUDNN_ROOT}/lib64:$LD_LIBRARY_PATH
-$ export CPLUS_INCLUDE_PATH=${CUDNN_ROOT}/include:$CPLUS_INCLUDE_PATH
-```  
-
-> Don't forget to source your bashrc
-
-3.2. Clone Anakin and build
-
-```bash
-$ git clone https://github.com/PaddlePaddle/Anakin.git  
-$ cd Anakin 
-$ git checkout developing 
-
-# tools directory contains multi-platform build scripts.
-
-# 1. using script to build.
-$ ./tools/x86_build.sh
-
-# 2. or you can build directly. This way you can build x86 and gpu  
-# at the same time by set corresponding variables(USE_GPU_PLACE, 
-# USE_X86_PLACE, USE_ARM_PLACE) in CMakeList.txt which is at Anakin 
-# source root directory. In this situation, set USE_X86_PLACE with YES, 
-# others with NO. And then type the following command:
-# $ mkdir build  
-# $ cd build  
-# $ cmake ..  
-# $ make
-```
-
-### 4. Building Anakin with AMD GPU Support ###
-
-Coming soon..
-
-## <span id = '0002'> Installing on Ubuntu </span> ##
-
-### 1. System requirements ###
-
-*  gcc 4.8.5/5.4.0
-*  g++ 4.8.5/5.4.0
-*  make 3.82+
-*  cmake 2.8.12+
-*  protobuf 3.4.0
-*  wget
-
-`Note: You need to use the gcc/g++ we recommend to build protobuf and Anakin, otherwise it might result some errors. ` 
-
-1.1 install wget
-```bash
-$ sudo apt-get install wget
-```
-
-1.2 install protobuf  
-```bash
-$ wget --no-check-certificate https://mirror.sobukus.de/files/src/protobuf/protobuf-cpp-3.4.0.tar.gz
-$ tar -xvf protobuf-cpp-3.4.0.tar.gz
-$ cd protobuf-3.4.0
-$ ./configure
-$ make -j
-$ make install
-```
-Check 
-```bash
-$ protoc --version  
-```
-  Any problems for protobuf installation, Please see [here](https://github.com/google/protobuf/blob/master/src/README.md)
-### 2. Building Anakin for CPU-only ###
-
-Please make sure that all pre-requirements have been installed on your system.
-
-2.1 Clone Anakin and build
-
-```bash
-$ git clone https://github.com/PaddlePaddle/Anakin.git  
-$ cd Anakin 
-$ git checkout developing  
-# tools directory contains multi-platform build scripts.
-# 1. using script to build.
-$ ./tools/x86_build.sh
-# 2. or you can build directly. This way you can build x86 and gpu  
-# at the same time by set corresponding variables(USE_GPU_PLACE, 
-# USE_X86_PLACE, USE_ARM_PLACE) in CMakeList.txt. In this situation, 
-# set USE_X86_PLACE with YES, others with NO.
-$ mkdir build  
-$ cd build  
-$ cmake ..  
-$ make   
-```
-
-### 3. Building Anakin with NVIDIA GPU Support ###
-
-3.1. Install dependences  
-3.1.1 CUDA Tookit
-- [CUDA 8.0](https://developer.nvidia.com/cuda-zone) or higher. For details, see [NVIDIA's documentation](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).
-- [cuDNN v7](https://developer.nvidia.com/cudnn). For details, see [NVIDIA's documentation](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).  
-  When you have installed cuDNN v7, please set the following variable to your `bashrc`  
-
- ```bash
-#set CUDA path(cuda 9.0 for example)
-export PATH=/usr/local/cuda-9.0/bin:$PATH #the path where your CUDA installed.
-export LD_LIBRARY_PATH=/usr/local/cuda-9.0/lib64:$LD_LIBRARY_PATH
-
-# CUDNN
-$ export CUDNN_ROOT=/usr/local/cudnn_v7 # the path where your cuDNN installed.
-$ export LD_LIBRARY_PATH=${CUDNN_ROOT}/lib64:$LD_LIBRARY_PATH
-$ export CPLUS_INCLUDE_PATH=${CUDNN_ROOT}/include:$CPLUS_INCLUDE_PATH
-```  
-
-> Don't forget to source your bashrc
-
-3.2. Clone Anakin and build
-
-```bash
-$ git clone https://github.com/PaddlePaddle/Anakin.git  
-$ cd Anakin 
-$ git checkout developing  
-# tools directory contains multi-platform build scripts.
-# 1. using script to build.
-$ ./tools/gpu_build.sh
-# 2. or you can build directly. This way you can build x86 and gpu  
-# at the same time by set corresponding variables(USE_GPU_PLACE, 
-# USE_X86_PLACE, USE_ARM_PLACE) in CMakeList.txt. In this situation, 
-# set USE_GPU_PLACE with YES, others with NO.
-$ mkdir build  
-$ cd build  
-$ cmake ..  
-$ make
-```
-
-### 4. Building Anakin with AMD GPU Support ###
-
-Coming soon..
+   
 
 
-## <span id = '0003'> Installing on ARM </span> ##
+- 3.2. Compile Anakin
+  >$ git clone https:/xxxxx  
+  >$ cd anakin  
+  >$ mkdir build  
+  >$ cd build  
+  >$ cmake ..  
+  >$ make   
+
+#### 4. Building Anakin with AMD GPU Support ####
+
+ For more detials of ROCm please see [RadeonOpenCompute/ROCm](https://github.com/RadeonOpenCompute/ROCm) 
+ 
+- 4.1. Setup Environment   
+
+ - 4.1.1 Update OS (Option, if your OS is able to be updated)     
+    >$sudo yum update
+    
+ - 4.1.2 Add ROCM repo   
+    Create a /etc/yum.repos.d/rocm.repo file with the following contents:
+    ```bash
+    [ROCm]
+    name=ROCm
+    baseurl=http://repo.radeon.com/rocm/yum/rpm
+    enabled=1
+    gpgcheck=0
+    ```
+    
+ - 4.1.3 Install ROCK-DKMS     
+    Please check your kernel version before installing ROCk-DKMS and make sure the result is same as your installed kernel related packages, such as kernel-headers and kerenl-devel
+    >$ uname -r 
+  
+  - 4.1.3.1 For kernel ver 3.10.0-`693` (Option 1)     
+     Download kernel-devel-3.10.0-693.el7.x86_64.rpm and kernel-headers-3.10.0-693.el7.x86_64.rpm    
+     >$sudo yum install kernel-devel-3.10.0-693.el7.x86_64.rpm  kernel-headers-3.10.0-693.el7.x86_64.rpm    
+     
+  - 4.1.3.2 For kernel ver 3.10.0-`862`  (Option 2)
+     >$ sudo yum install kernel-devel kernel-headers    
+     
+  - 4.1.3.3 Install ROCk-DKMS   
+     >$ sudo yum install epel-release   
+     >$ sudo yum install dkms   
+     >$ sudo yum install rock-dkms  
+      
+     Use below command to check amdgpu is installed successful or not.    
+     >$ sudo dkms status    
+     >$ 'amdgpu, 1.8-151.el7, ..., x86_64: installed (original_module exists)'    
+      
+  - 4.1.3.4    
+     Reboot your device.
+     
+ ** If you are using docker than step 4.1.4 to 4.1.9 are not required **
+ 
+ - 4.1.4 Install ROCm-OpenCL
+    >$sudo yum install rocm-opencl rocm-opencl-devel rocm-smi rocminfo
+ 
+ - 4.1.5 Install MIOpenGemm and necessary pckage
+    >$sudo yum install miopengemm rocm-cmake openssl-devel
+
+ - 4.1.6 Add user to the video (or wheel) group 
+    >$sudo usermod -a -G video $LOGNAME 
+    
+ - 4.1.7 Setting Environment variables
+    ```bash
+    echo 'export PATH=/opt/rocm/bin:/opt/rocm/opencl/bin/x86_64:$PATH' >> $HOME/.bashrc
+    echo 'export LD_LIBRARY_PATH=/opt/rocm/lib:$LD_LIBRARY_PATH' >> $HOME/.bashrc
+    echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/usr/local/lib64' >>$HOME/.bashrc
+    source ~/.bashrc
+    ```
+   Check 
+    >$ clinfo
+ 
+ - 4.1.8 protobuf 3.4.0  
+    Download source from https://github.com/google/protobuf/releases/tag/v3.4.0
+    >tar -zxvf protobuf-cpp-3.4.0.tar.gz  
+    >$ cd protobuf-3.4.0    
+    >$ ./configure    
+    >$ make  
+    >$ make install  
+
+   Check  
+    >$ protoc --version
+
+    Any problems for protobuf installation, Please see [here](https://github.com/google/protobuf/blob/master/src/README.md)
+    
+ - 4.1.9 cmake 3.2.0
+    Download source from https://cmake.org/files/v3.2/cmake-3.2.0.tar.gz
+    >tar -zxvf cmake-3.2.0.tar.gz  
+    >$ cd cmake-3.2.0
+    >$ ./bootstrap   
+    >$ make -j4    
+    >$ make install  
+    
+- 4.2. Compile Anakin
+  >$ git clone xxx  
+  >$ cd anakin  
+  >$ ./tools/amd_gpu_build.sh
+ 
+- 4.3. Run Benchmark
+  >$ cd output/unit_test    
+  >$ benchmark ../../benchmark/CNN/models/ vgg16.anakin.bin 1 2 100
+
+### <span id = '0002'> Installing on Ubuntu </span> ###
+
+#### 1. Building Anakin with AMD GPU Support ####
+
+For more detials of ROCm please see [RadeonOpenCompute/ROCm](https://github.com/RadeonOpenCompute/ROCm) 
+
+- 1.1. Setup Environment
+
+ - 1.1.1 Update OS (Option, if your OS is able to be updated)
+    >$sudo apt-get update
+
+ - 1.1.2 Add ROCM apt repo
+    For Debian based systems, like Ubuntu, configure the Debian ROCm repository as follows:
+    >$wget -qO - http://repo.radeon.com/rocm/apt/debian/rocm.gpg.key | sudo apt-key add -
+    >$echo 'deb [arch=amd64] http://repo.radeon.com/rocm/apt/debian/ xenial main' | sudo tee /etc/apt/sources.list.d/rocm.list
+
+ - 1.1.3 Install ROCK-DKMS
+    Please check your kernel version before installing ROCk-DKMS and make sure the result is same as your installed kernel related packages, such as kernel-headers and kerenl-devel
+    >$ uname -r
+
+  - 1.1.3.1 Removing pre-release packages (Option)
+     Before proceeding, make sure to completely [uninstall any previous ROCm package](https://github.com/RadeonOpenCompute/ROCm#removing-pre-release-packages)
+     >$ sudo apt purge hsakmt-roct
+     >$ sudo apt purge hsakmt-roct-dev
+     >$ sudo apt purge compute-firmware
+     >$ sudo apt purge $(dpkg -l | grep 'kfd\|rocm' | grep linux | grep -v libc | awk '{print $2}')
+
+  - 1.1.3.2 Install ROCk-DKMS
+     >$ sudo apt-get update
+     >$ sudo apt-get install rock-dkms
+
+     Use below command to check amdgpu is installed successful or not.
+     >$ sudo dkms status
+     >$ 'amdgpu, 1.8-151.el7, ..., x86_64: installed (original_module exists)'
+
+  - 1.1.3.3
+     Reboot your device.
+
+ ** If you are using docker than step 1.1.4 to 1.1.9 are not required **
+
+ - 1.1.4 Install ROCm-OpenCL
+    >$ sudo apt-get install rocm-opencl rocm-opencl-devel rocm-smi rocminfo
+
+ - 1.1.5 Install MIOpenGemm and necessary pckage
+    >$ sudo apt-get install miopengemm rocm-cmake libssl-dev libnuma-dev
+
+ - 1.1.6 Add user to the video (or wheel) group
+    >$ sudo usermod -a -G video $LOGNAME
+
+ - 1.1.7 Setting Environment variables
+    >$ echo 'export LD_LIBRARY_PATH=/opt/rocm/opencl/lib/x86_64:/opt/rocm/hsa/lib:$LD_LIBRARY_PATH' | sudo tee -a /etc/profile.d/rocm.sh
+    >$ echo 'export PATH=$PATH:/opt/rocm/bin:/opt/rocm/profiler/bin:/opt/rocm/opencl/bin/x86_64' | sudo tee -a /etc/profile.d/rocm.sh
+    Check
+    >$ clinfo
+
+ - 1.1.8 protobuf 3.4.0
+    Download source from https://github.com/google/protobuf/releases/tag/v3.4.0
+    >tar -zxvf protobuf-cpp-3.4.0.tar.gz
+    >$ cd protobuf-3.4.0
+    >$ ./configure
+    >$ make
+    >$ make install
+
+   Check
+    >$ protoc --version
+
+    Any problems for protobuf installation, Please see [here](https://github.com/google/protobuf/blob/master/src/README.md)
+
+ - 1.1.9 cmake 3.2.0
+    Download source from https://cmake.org/files/v3.2/cmake-3.2.0.tar.gz
+    >$ tar -zxvf cmake-3.2.0.tar.gz
+    >$ cd cmake-3.2.0
+    >$ ./bootstrap
+    >$ make -j4
+    >$ make install
+
+- 1.2. Compile Anakin
+  >$ git clone xxx
+  >$ cd anakin
+  >$ ./tools/amd_gpu_build.sh
+
+- 1.3. Run Benchmark
+  >$ cd output/unit_test
+  >$ benchmark ../../benchmark/CNN/models/ vgg16.anakin.bin 1 2 100
+
+### <span id = '0003'> Installing on ARM </span> ###
 
 Please refer to [run on arm](run_on_arm_en.md)
 
-## <span id = '0004'> Verifying installation </span> ##
+### <span id = '0004'> Verifying installation </span> ###
 
 If build successfully, the libs will be in the directory `output/`, and you can run unit test in `output/unit_test` to verify your installation.
 

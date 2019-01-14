@@ -3,119 +3,99 @@
 namespace anakin {
 
 namespace ops {
-    
 
-#if defined(USE_X86_PLACE) || defined(BUILD_LITE)
-    template<>
-    void Power<X86, AK_FLOAT, Precision::FP32>::operator()(
-                                                          OpContext<X86>& ctx,
-                                                          const std::vector<Tensor4dPtr<X86, AK_FLOAT> >& ins,
-                                                          std::vector<Tensor4dPtr<X86, AK_FLOAT> >& outs) {
-        auto* impl =
-        static_cast<PowerHelper<X86, AK_FLOAT, Precision::FP32>*>(this->_helper);
-        auto& param = impl->_param_power;
-        impl->_funcs_power(ins, outs, param, ctx);
-    }
-#endif
-    
-#ifdef USE_CUDA
-template<>
-void Power<NV, AK_FLOAT, Precision::FP32>::operator()(
-    OpContext<NV>& ctx,
-    const std::vector<Tensor4dPtr<NV, AK_FLOAT> >& ins,
-    std::vector<Tensor4dPtr<NV, AK_FLOAT> >& outs) {
-    auto* impl =
-        static_cast<PowerHelper<NV, AK_FLOAT, Precision::FP32>*>(this->_helper);
-    auto& param = impl->_param_power;
-    impl->_funcs_power(ins, outs, param, ctx);
+#define INSTANCE_POWER(Ttype, Ptype) \
+template<> \
+void Power<Ttype, Ptype>::operator()(OpContext<Ttype>& ctx, \
+    const std::vector<Tensor4dPtr<Ttype> >& ins, \
+    std::vector<Tensor4dPtr<Ttype> >& outs) { \
+    auto* impl = static_cast<PowerHelper<Ttype, Ptype>*>(this->_helper); \
+    auto& param = static_cast<PowerHelper<Ttype, Ptype>*> \
+                  (this->_helper)->_param_power; \
+    impl->_funcs_power(ins, outs, param, ctx); \
 }
-#endif
-/// TODO ... specialization other type of operator
-#ifdef USE_ARM_PLACE
-template<>
-void Power<ARM, AK_FLOAT, Precision::FP32>::operator()(
-    OpContext<ARM>& ctx,
-    const std::vector<Tensor4dPtr<ARM, AK_FLOAT> >& ins,
-    std::vector<Tensor4dPtr<ARM, AK_FLOAT> >& outs) {
-    auto* impl =
-        static_cast<PowerHelper<ARM, AK_FLOAT, Precision::FP32>*>(this->_helper);
-    auto& param = impl->_param_power;
-    impl->_funcs_power(ins, outs, param, ctx);
-}
-#endif
 
 /// set helper
-template<typename Ttype, DataType Dtype, Precision Ptype>
-PowerHelper<Ttype, Dtype, Ptype>::~PowerHelper() {
+template<typename Ttype, Precision Ptype>
+PowerHelper<Ttype, Ptype>::~PowerHelper() {
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-Status PowerHelper<Ttype, Dtype, Ptype>::InitParam() {
+template<typename Ttype, Precision Ptype>
+Status PowerHelper<Ttype, Ptype>::InitParam() {
     DLOG(WARNING) << "Parsing Power op parameter.";
     auto scale = GET_PARAMETER(float, scale);
     auto shift = GET_PARAMETER(float, shift);
     auto power = GET_PARAMETER(float, power);
 
-    saber::PowerParam<Tensor4d<Ttype, Dtype>> power_param(power, scale, shift);
+    saber::PowerParam<Ttype> power_param(power, scale, shift);
     _param_power = power_param;
     return Status::OK();
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-Status PowerHelper<Ttype, Dtype, Ptype>::Init(OpContext<Ttype>& ctx,
-        const std::vector<Tensor4dPtr<Ttype, Dtype> >& ins,
-        std::vector<Tensor4dPtr<Ttype, Dtype> >& outs) {
+template<typename Ttype, Precision Ptype>
+Status PowerHelper<Ttype, Ptype>::Init(OpContext<Ttype>& ctx,
+                                       const std::vector<Tensor4dPtr<Ttype> >& ins,
+                                       std::vector<Tensor4dPtr<Ttype> >& outs) {
     SABER_CHECK(_funcs_power.init(ins, outs, _param_power, SPECIFY, SABER_IMPL, ctx));
     return Status::OK();
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-Status PowerHelper<Ttype, Dtype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Ttype, Dtype> >&
+template<typename Ttype, Precision Ptype>
+Status PowerHelper<Ttype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Ttype> >&
         ins,
-        std::vector<Tensor4dPtr<Ttype, Dtype> >& outs) {
+        std::vector<Tensor4dPtr<Ttype> >& outs) {
     SABER_CHECK(_funcs_power.compute_output_shape(ins, outs, _param_power));
     return Status::OK();
 }
-#if defined(USE_X86_PLACE) || defined(BUILD_LITE)
-    template class PowerHelper<X86, AK_FLOAT, Precision::FP32>;
-    template class PowerHelper<X86, AK_FLOAT, Precision::FP16>;
-    template class PowerHelper<X86, AK_FLOAT, Precision::INT8>;
-#endif
 
 #ifdef USE_CUDA
-template class PowerHelper<NV, AK_FLOAT, Precision::FP32>;
-template class PowerHelper<NV, AK_FLOAT, Precision::FP16>;
-template class PowerHelper<NV, AK_FLOAT, Precision::INT8>;
+INSTANCE_POWER(NV, Precision::FP32);
+template class PowerHelper<NV, Precision::FP32>;
+template class PowerHelper<NV, Precision::FP16>;
+template class PowerHelper<NV, Precision::INT8>;
 #endif
 
 #ifdef USE_ARM_PLACE
-template class PowerHelper<ARM, AK_FLOAT, Precision::FP32>;
-template class PowerHelper<ARM, AK_FLOAT, Precision::FP16>;
-template class PowerHelper<ARM, AK_FLOAT, Precision::INT8>;
+INSTANCE_POWER(ARM, Precision::FP32);
+template class PowerHelper<ARM, Precision::FP32>;
+template class PowerHelper<ARM, Precision::FP16>;
+template class PowerHelper<ARM, Precision::INT8>;
+#endif
+
+#if defined USE_X86_PLACE || defined BUILD_LITE
+INSTANCE_POWER(X86, Precision::FP32);
+template class PowerHelper<X86, Precision::FP32>;
+template class PowerHelper<X86, Precision::FP16>;
+template class PowerHelper<X86, Precision::INT8>;
+#endif
+
+#ifdef AMD_GPU
+INSTANCE_POWER(AMD, Precision::FP32);
+template class PowerHelper<AMD, Precision::FP32>;
+ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, AMD, Precision::FP32);
 #endif
 
 // register helper
-#if defined(USE_X86_PLACE) || defined(BUILD_LITE)
-    ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, X86, AK_FLOAT, Precision::FP32);
-#endif
 #ifdef USE_CUDA
-ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, NV, AK_FLOAT, Precision::FP32);
+ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, NV, Precision::FP32);
 #endif
 #ifdef USE_ARM_PLACE
-ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, ARM, AK_FLOAT, Precision::FP32);
+ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, ARM, Precision::FP32);
 #endif
-
+#if defined USE_X86_PLACE || defined BUILD_LITE
+ANAKIN_REGISTER_OP_HELPER(Power, PowerHelper, X86, Precision::FP32);
+#endif
 //! register op
 ANAKIN_REGISTER_OP(Power)
 .Doc("Power operator")
 #ifdef USE_CUDA
-.__alias__<NV, AK_FLOAT, Precision::FP32>("power")
+.__alias__<NV, Precision::FP32>("power")
 #endif
 #ifdef USE_ARM_PLACE
-.__alias__<ARM, AK_FLOAT, Precision::FP32>("power")
+.__alias__<ARM, Precision::FP32>("power")
 #endif
-#if defined(USE_X86_PLACE) || defined(BUILD_LITE)
-.__alias__<X86, AK_FLOAT, Precision::FP32>("power")
+#if defined USE_X86_PLACE || defined BUILD_LITE
+.__alias__<X86, Precision::FP32>("power")
 #endif
 .num_in(1)
 .num_out(1)

@@ -31,20 +31,20 @@ namespace graph {
  * \brief Graph class
  * public inherit GraphBase
 */
-template<typename Ttype, DataType Dtype, Precision Ptype>
+template<typename Ttype, Precision Ptype>
 class Graph : public GraphBase<std::string, 
-                               NodePtr<Ttype, Dtype, Ptype>, 
-                               Tensor4dPtr<Ttype, Dtype>, 
-                               Edge<Ttype, Dtype> > {
+                               NodePtr, 
+                               Tensor4dPtr<Ttype>, 
+                               Edge<Ttype> > {
 public:
     Graph():GraphBase<std::string, 
-                      NodePtr<Ttype, Dtype, Ptype>, 
-                      Tensor4dPtr<Ttype, Dtype>, 
-                      Edge<Ttype, Dtype> >() {}
+                      NodePtr, 
+                      Tensor4dPtr<Ttype>, 
+                      Edge<Ttype> >() {}
     Graph(size_t size):GraphBase<std::string, 
-                                 NodePtr<Ttype, Dtype, Ptype>, 
-                                 Tensor4dPtr<Ttype, Dtype>, 
-                                 Edge<Ttype, Dtype> >(size) {}
+                                 NodePtr, 
+                                 Tensor4dPtr<Ttype>, 
+                                 Edge<Ttype> >(size) {}
 
     ~Graph() {
         if(_vgraph) { 
@@ -68,11 +68,8 @@ public:
     virtual bool directed() final { return true; }
 
     /// Parsing from model
-    Status load(std::istream* instream);
     Status load(std::string model_path); 
     Status load(const char*  model_path);
-    Status load(const char* buffer, size_t len);
-
     Status save(std::string model_path);
     Status save(const char*  model_path);
     /// Get nodes in execution oroder.
@@ -115,7 +112,7 @@ public:
      * \biref shallow copy of graph
      * note: only copy parameters and architecture, but not the weights
     */
-    Status CopyFrom(Graph<Ttype, Dtype, Ptype>& graph);
+    Status CopyFrom(Graph<Ttype, Ptype>& graph);
 
     ///< statistics stand for Statistics info of anakin graph
     Statistics statistics;
@@ -154,9 +151,6 @@ private:
     std::string _model_path{"None"} GUARDED_BY(this->_mut);
     /// this make the graph optimized.
     bool _has_graph_optimized{false}; GUARDED_BY(this->_mut);
-
-    const char* _buffer{NULL} GUARDED_BY(this->_mut);
-    size_t _len{0} GUARDED_BY(this->_mut);
     std::mutex _mut;
 }; 
 

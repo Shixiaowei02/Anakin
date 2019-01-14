@@ -20,33 +20,34 @@
 #include "framework/core/data_types.h"
 #include "framework/core/operator/operator.h"
 #include "utils/logger/logger.h"
-#include "saber/funcs/conv_act.h"
+#include "saber/funcs/conv.h"
 
 namespace anakin {
 
 namespace ops {
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
+template<typename Ttype, Precision Ptype>
 class SassConvBatchnormScaleHelper;
 
+/// pooling op
 /**
  * \brief SassConvBatchnormScale implementation class
  * public inherit Operator
  */
-template<typename Ttype, DataType Dtype, Precision Ptype>
-class SassConvBatchnormScale : public Operator<Ttype, Dtype, Ptype> {
+template<typename Ttype, Precision Ptype>
+class SassConvBatchnormScale : public Operator<Ttype, Ptype> {
 public:
     SassConvBatchnormScale() {}
 
     /// forward impl
     virtual void operator() (OpContext<Ttype> &ctx, 
-                             const std::vector<Tensor4dPtr<Ttype, Dtype> >& ins, 
-                             std::vector<Tensor4dPtr<Ttype, Dtype> >& outs) {
-        //LOG(ERROR) << "Not Impl Yet Operator convolution<TargetType:"<<"unknown"<<","
-                   //<<type_id<typename DataTypeWarpper<Dtype>::type>().type_info()<<">";
+                             const std::vector<Tensor4dPtr<Ttype> >& ins, 
+                             std::vector<Tensor4dPtr<Ttype> >& outs) {
+		LOG(ERROR) << "Not Impl Yet Operator SassConvBatchnormScale< Ttype("
+				   << target_name<Ttype>::value << "), Precision("<< Ptype <<") >";	
     }
 
-    friend class SassConvBatchnormScaleHelper<Ttype, Dtype, Ptype>;
+    friend class SassConvBatchnormScaleHelper<Ttype, Ptype>;
 };
 
 /**
@@ -54,8 +55,8 @@ public:
  * public inherit OperatorHelper
  * including init resource and shape size in SassConvBatchnormScale context
  */
-template<typename Ttype, DataType Dtype, Precision Ptype>
-class SassConvBatchnormScaleHelper : public OperatorHelper<Ttype, Dtype, Ptype> {
+template<typename Ttype, Precision Ptype>
+class SassConvBatchnormScaleHelper : public OperatorHelper<Ttype, Ptype> {
 public:
     SassConvBatchnormScaleHelper()=default;
 
@@ -64,15 +65,15 @@ public:
     Status InitParam() override;
     
     /**
-    * \brief initial all the resource needed
+    * \brief initial all the resource needed by pooling
     * \param ctx stand for SassConvBatchnormScale operation context
     * \param ins stand for input tensor vector
     * \param outs stand for output tensor vector
     * \return status
-    *///! initial all the resource needed
+    *///! initial all the resource needed by pooling
     Status Init(OpContext<Ttype> &ctx,
-                const std::vector<Tensor4dPtr<Ttype, Dtype> >& ins, 
-                std::vector<Tensor4dPtr<Ttype, Dtype> >& outs) override;
+                const std::vector<Tensor4dPtr<Ttype> >& ins, 
+                std::vector<Tensor4dPtr<Ttype> >& outs) override;
 
     /**
     * \brief infer the shape of output and input.
@@ -80,14 +81,14 @@ public:
     * \param outs stand for output tensor vector
     * \return status
     */
-    Status InferShape(const std::vector<Tensor4dPtr<Ttype, Dtype> >& ins,
-                      std::vector<Tensor4dPtr<Ttype, Dtype> >& outs) override;
+    Status InferShape(const std::vector<Tensor4dPtr<Ttype> >& ins,
+                      std::vector<Tensor4dPtr<Ttype> >& outs) override;
 
 public:
-     ///< _param_conv_batchnorm_scale_relu stand for SassConvBatchnormScale parameter
-    saber::ConvActiveParam<Tensor4d<Ttype, Dtype>>  _param_conv_batchnorm_scale_relu;
-    ///< _funcs_conv_batchnorm_scale_relu stand for SassConvBatchnormScale function 
-    saber::ConvAct<Ttype, Dtype> _funcs_conv_batchnorm_scale_relu;
+     ///< _param_conv_batchnorm_scale stand for SassConvBatchnormScale parameter
+    saber::ConvParam<Ttype>  _param_conv_batchnorm_scale;
+    ///< _funcs_conv_batchnorm_scale stand for SassConvBatchnormScale function 
+    saber::Conv<Ttype, PrecisionWrapper<Ptype>::saber_type> _funcs_conv_batchnorm_scale;
 
 private:
     ///< _dims stand for SassConvBatchnormScale size

@@ -1,0 +1,1 @@
+cmd='/usr/.local/cmake-3.12.2/bin/cmake;-DMIOPEN_BACKEND=OpenCL;-DCMAKE_INSTALL_PREFIX=/home/shixiaowei02/workspace/Anakin/output/miopen;-DCMAKE_INSTALL_LIBDIR=lib;-GUnix Makefiles;<SOURCE_DIR><SOURCE_SUBDIR>'

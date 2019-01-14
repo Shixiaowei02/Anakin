@@ -1,6 +1,9 @@
 #!/bin/bash
-# This script shows how one can build a anakin for the Android platform using android-tool-chain. 
-export ANDROID_NDK=/Users/lixiaoyang05/android-ndk-r14b
+# This script shows how one can build a anakin for the Android platform using android-tool-chain.
+# IMPORTANT!!!!!!!!!!!!!!
+# remove "-g" compile flags in  "$ANDROID_NDK/build/cmake/android.toolchain.cmake"
+# to remove debug info
+export ANDROID_NDK=/home/public/android-ndk-r14b/
 
 ANAKIN_LITE_ROOT="$( cd "$(dirname "$0")" ; pwd -P)"
 echo "-- Anakin lite root dir is: $ANAKIN_LITE_ROOT"
@@ -30,20 +33,24 @@ echo "-- Build anakin lite Android into: $BUILD_ROOT"
 # Now, actually build the android target.
 echo "-- Building anakin lite ..."
 cd $BUILD_ROOT
-
+#-DCMAKE_TOOLCHAIN_FILE=../../../cmake/android/android.toolchain.cmake \ # set toolchain file to file in this project
+#-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \ # set toolchain file to NDK default
+#-DANDROID_STL=gnustl_static \ # set stl lib
+#-DANDROID_TOOLCHAIN=clang \ # set compile to gcc or clang
 cmake .. \
     -DCMAKE_TOOLCHAIN_FILE=../../../cmake/android/android.toolchain.cmake \
     -DANDROID_NDK=$ANDROID_NDK \
+    -DANDROID_NATIVE_API_LEVEL=21 \
     -DANDROID_ABI="arm64-v8a" \
-    -DCMAKE_BUILD_TYPE=Release \
+    -DENABLE_DEBUG=NO \
     -DUSE_ARMV8=YES \
-	-DANDROID_NATIVE_API_LEVEL=21 \
 	-DUSE_ANDROID=YES \
 	-DTARGET_IOS=NO \
     -DUSE_OPENMP=YES \
     -DBUILD_LITE_UNIT_TEST=YES \
     -DUSE_OPENCV=NO \
-    -DENABLE_OP_TIMER=NO
+    -DENABLE_OP_TIMER=NO \
+    -DUSE_ANDROID_LOG=NO
 
 # build target lib or unit test.
 if [ "$(uname)" = 'Darwin' ]; then
@@ -52,3 +59,16 @@ else
     make "-j$(nproc)" && make install
 fi
 
+OUT_DIR=$BUILD_ROOT/../../../output
+if [ -d $OUT_DIR/android_armv8 ];then
+	rm -rf $OUT_DIR/android_armv8
+	mkdir -p $OUT_DIR/android_armv8/include
+    mkdir -p $OUT_DIR/android_armv8/lib
+else
+    mkdir -p $OUT_DIR/android_armv8/include
+    mkdir -p $OUT_DIR/android_armv8/lib
+fi
+
+cp -r include/ $OUT_DIR/android_armv8/include
+cp -r lib/ $OUT_DIR/android_armv8/lib
+cp -r unit_test/ $OUT_DIR/android_armv8/unit_test

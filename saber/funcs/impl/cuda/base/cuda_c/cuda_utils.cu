@@ -1,4 +1,4 @@
-#include "cuda_utils.h"
+#include "saber/funcs/impl/cuda/cuda_utils.h"
 namespace anakin {
 
 namespace saber {
@@ -40,7 +40,6 @@ void trans_map2out_cfunc(const Dtype* input, Dtype* output, int word_size, int s
     trans_map2out << < grid_dim, block_dim, 0, stream >> > (output, input, dev_map_vec,
                   count, word_size);
 
-    //    cudaDeviceSynchronize();
 }
 
 template<typename Dtype>
@@ -65,11 +64,12 @@ template void trans_map2in_cfunc<float>(const float* input, float* output, int h
 template void trans_map2out_cfunc<float>(const float* input, float* output, int word_size, int seq_sum,
                          cudaStream_t stream,
                          int* dev_map_vec);
+
 template <typename Dtype>
 __global__ void sub_tensor(const Dtype* in, Dtype* out, int h, int w, int stride_w) {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     if (tid >= h * w) {
-       return;
+        return;
     }
     int h_id = tid / w;
     int w_id = tid % w;
@@ -83,6 +83,8 @@ void  get_sub_tensor(const Dtype* in, Dtype* out, int h, int w, int stride_w, cu
 }
 
 template  void get_sub_tensor(const float* in, float* out, int h, int w, int stride_w, cudaStream_t stream);
+
+
 
 }
 }

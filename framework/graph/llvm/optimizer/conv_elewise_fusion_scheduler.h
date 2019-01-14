@@ -32,6 +32,7 @@ struct ConvElsFusionHelper {
 private:
 	std::vector<std::string> ops {
 		"ConvBatchnormScale",
+        "convolution"
 	};
 	struct conv_eltwise_pair {
 		std::string conv_name;

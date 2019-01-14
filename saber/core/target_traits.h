@@ -15,7 +15,7 @@
 
 #ifndef ANAKIN_SABER_CORE_TARGET_TRAITS_H
 #define ANAKIN_SABER_CORE_TARGET_TRAITS_H
-#include "saber/core/common.h"
+#include "core/common.h"
 
 namespace anakin{
 
@@ -28,6 +28,7 @@ struct __cuda_device{};
 struct __arm_device{};
 struct __amd_device{};
 struct __x86_device{};
+struct __bm_device{};
 
 struct __HtoD{};
 struct __HtoH{};
@@ -68,6 +69,18 @@ template <>
 struct TargetTypeTraits<AMD> {
   typedef __device_target target_category;
   typedef __amd_device target_type;
+};
+
+template <>
+struct TargetTypeTraits<BM> {
+  typedef __device_target target_category;
+  typedef __bm_device target_type;
+};
+
+template <>
+struct TargetTypeTraits<AMDHX86> {
+  typedef __host_target target_category;
+  typedef __x86_device target_type;
 };
 
 } //namespace saber

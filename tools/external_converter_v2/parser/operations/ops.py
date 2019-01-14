@@ -7,6 +7,8 @@ from op_io import *
 ############################# IO define ##############################
 # graph may has mult-inputs, so graph will have multi-input
 OpsRegister.Register("Input").set_attr(input_shape=list(),
+                                       max_len = int(),
+                                       max_batch = int(),
                                        alias="NULL",
                                        data_type="NULL")
 
@@ -79,6 +81,7 @@ OpsRegister.Register("ELU").set_attr(alpha=int())
 
 # dense op parameter
 OpsRegister.Register("Dense").set_attr(out_dim=int(), 
+                                       in_dim=int(),
                                        axis=int(), 
                                        bias_term=bool())
 
@@ -223,10 +226,11 @@ OpsRegister.Register("RNN").set_attr(hidden_size=int(),
 
 ############################# embedding Op define ##############################
 # embedding layer, input_dim in tf or caffe means the voc num and output_dim means the emb size
+"""
 OpsRegister.Register("Embedding").set_attr(input_dim=int(), 
                                            output_dim=int(), 
                                            bias_term=bool())
-
+"""
 ############################# Accuracy Op define ##############################
 # NULL 
 
@@ -318,7 +322,9 @@ OpsRegister.Register("CtcAlign").set_attr(merge_repeated=bool(),
 
 OpsRegister.Register("Embedding").set_attr(word_num=int(),
                                            emb_dim=int(),
-                       padding_idx=int())
+                                           padding_idx=int(),
+                                           num_direct=int(),
+                                           need_reverse=bool())
 
 
 OpsRegister.Register("SequencePool").set_attr(pooltype="LAST")
@@ -370,3 +376,76 @@ OpsRegister.Register("Pad").set_attr(pad_c=list(),
 
 
 OpsRegister.Register("ShuffleChannel").set_attr(group=int())
+
+OpsRegister.Register("RoisAnchorFeature").set_attr(min_anchor_size=float(),
+                                                   num_anchor_scales=int(),
+                                                   anchor_scale_pow_base=float(),
+                                                   anchor_wph_ratios=list(),
+                                                   num_top_iou_anchor=int(),
+                                                   min_num_top_iou_anchor=int(),
+                                                   iou_thr=float(),
+                                                   ft_ratio_h=bool(),
+                                                   ft_ratio_w=bool(),
+                                                   ft_log_ratio_h=bool(),
+                                                   ft_log_ratio_w=bool(),
+                                                   bbox_size_add_one=bool())
+
+OpsRegister.Register("Interp").set_attr(height=int(),
+                                        width=int(),
+                                        zoom_factor=int(),
+                                        shrink_factor=int(),
+                                        pad_beg=int(),
+                                        pad_end=int())
+
+
+##################################### reverse_sequence op define ############################    #########
+####### it is named BatchReverseSequenceLayer in lego
+#
+OpsRegister.Register("ReverseSequence").set_attr()  ##no prams , no weights.
+
+##################################### reverse op define #####################################
+####### it is named BatchReverseInputLayer in lego
+OpsRegister.Register("Reverse").set_attr()   ## no prams, no weights.
+
+##################################### embedding_lg op define ################################    #####
+####### it is named BatchEmbeddingLayer in lego
+OpsRegister.Register("EmbeddingLg").set_attr() ## ???? is it same to Embedding?
+
+##################################### grnn(single-layer, single-direction GRU) op define ####    #################################
+####### it is named BatchGrnnLayer in lego
+OpsRegister.Register("GRNN").set_attr() ## ???? is it same to RNN?
+
+##################################### match_matrix op define ################################    #####
+####### it is named BatchMatchMatrixTensorLayer in lego
+OpsRegister.Register("MatchMatrix").set_attr(dim_in = int(),
+                                             dim_t = int(),
+                                             linear_term = bool(),
+                                             bias_term = bool(),
+                                             diag_init = int(),
+                                             diag_init_dim_num = int(),
+                                             init_low = int(),
+                                             init_up = int())
+
+
+##################################### var_size_conv op define ###############################    ######
+####### it is named BatchVarSizeConvLayer in lego
+OpsRegister.Register("VarSizeConv").set_attr()  ## it is same to convolution????
+##################################### topk_pooling op define ################################    #####
+###### it is named BatchTopKPoolingLayer in lego
+OpsRegister.Register("TopKPooling").set_attr(top_k = int(),
+                                             feat_map_num = int())
+
+##################################### topk_avg_pooling op define ############################    #########
+###### it is named BatchTopKAvgPoolingByRowLayer in lego
+OpsRegister.Register("TopKAvgPooling").set_attr(top_ks = list(),
+                                                feat_map_num = int(),
+                                                is_pooling_by_row = bool())
+
+##################################### extract_last op define ################################    #####
+###### it is named BatchExtractLastLayer in lego,
+OpsRegister.Register("SequencePool").set_attr(pooltype = str())  #no paras, no weights.
+
+
+#####################################Unpadding_padding op define ############################    #########
+###### it is named UnpaddingPaddingLayer in lego,
+OpsRegister.Register("ConvUnpaddingPadding").set_attr()  #no paras, no weights.

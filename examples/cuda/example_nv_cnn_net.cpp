@@ -16,6 +16,7 @@ int main(int argc, const char** argv) {
 
     /*load model from file to init the graph*/
     auto status = graph.load("Resnet50.anakin.bin");
+
     if (!status) {
         LOG(FATAL) << " [ERROR] " << status.info();
     }
@@ -46,10 +47,10 @@ int main(int argc, const char** argv) {
     /*run infer*/
     net_executer.prediction();
 
-    LOG(INFO)<<"infer finash";
+    LOG(INFO) << "infer finash";
 
     /*get the out put of net, which is a device tensor*/
-    auto d_out=net_executer.get_out("prob_out");
+    auto d_out = net_executer.get_out("prob_out");
 
     /*create another host tensor, and copy the content of device tensor to host*/
     Tensor4d<X86, AK_FLOAT> h_tensor_out;
@@ -57,10 +58,10 @@ int main(int argc, const char** argv) {
     h_tensor_out.copy_from(*d_out);
 
     /*show output content*/
-    for(int i=0;i<h_tensor_out.valid_size();i++){
-        LOG(INFO)<<"out ["<<i<<"] = "<<h_tensor_out.data()[i];
+    for (int i = 0; i < h_tensor_out.valid_size(); i++) {
+        LOG(INFO) << "out [" << i << "] = " << h_tensor_out.data()[i];
     }
 }
 #else
-int main(){}
+int main() {}
 #endif

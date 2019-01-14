@@ -16,7 +16,7 @@
 #ifndef ANAKIN_SABER_CORE_ENV_H
 #define ANAKIN_SABER_CORE_ENV_H
 
-#include "saber/core/device.h"
+#include "core/device.h"
 
 namespace anakin{
 
@@ -25,35 +25,57 @@ namespace saber{
 template <typename TargetType>
 class Env {
 public:
-    typedef TargetWrapper<TargetType> API;
+    typedef TargetWrapper<TargetType> AMD_API;
     typedef std::vector<Device<TargetType>> Devs;
     static Devs& cur_env() {
         static Devs* _g_env = new Devs();
         return *_g_env;
     }
-    static void env_init(int max_stream = 1){
+    static void env_init(int max_stream = 4){
         Devs& devs = cur_env();
         if (devs.size() > 0){
             return;
         }
         int count = 0;
-        API::get_device_count(count);
+        AMD_API::get_device_count(count);
         if (count == 0) {
-            LOG(WARNING) << "no device found!";
+            CHECK(false) << "no device found!";
         } else {
             LOG(INFO) << "found " << count << " device(s)";
         }
-        int cur_id = API::get_device_id();
+        int cur_id = AMD_API::get_device_id();
         for (int i = 0; i < count; i++) {
-            API::set_device(i);
+            AMD_API::set_device(i);
             devs.push_back(Device<TargetType>(max_stream));
         }
-        API::set_device(cur_id);
+        AMD_API::set_device(cur_id);
+        LOG(INFO)<<"dev size = "<<devs.size();
     }
 private:
     Env(){}
 };
 
+#ifdef AMD_GPU 
+template <>
+class Env<AMD> {
+public:
+    typedef TargetWrapper<AMD> AMD_API;
+    typedef std::vector<Device<AMD>> Devs;
+    static Devs& cur_env() {
+        static Devs* _g_env = new Devs();
+        return *_g_env;
+    }
+
+    static void env_init(int max_stream = 4);
+    static bool is_init(); 
+    static cl_platform_id get_platform_id();
+
+private:
+    Env(){}
+
+    static cl_platform_id platform_id;
+};
+#endif
 
 } //namespace saber
 
