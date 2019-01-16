@@ -29,9 +29,9 @@ SaberStatus SaberPixelShuffle<AMD, OpDtype>::init(
     Context<AMD>& ctx) {
 
     this->_ctx = &ctx;
-    _old_steps.re_alloc(Shape(1, 1, 1, 6));
-    _new_steps.re_alloc(Shape(1, 1, 1, 6));
-    _permute_order.re_alloc(Shape(1, 1, 1, 6));
+    _old_steps.re_alloc(Shape({1, 1, 1, 6}), AK_INT32);
+    _new_steps.re_alloc(Shape({1, 1, 1, 6}), AK_INT32);
+    _permute_order.re_alloc(Shape({1, 1, 1, 6}), AK_INT32);
 
     return create(inputs, outputs, param, ctx);
 }
@@ -93,8 +93,8 @@ SaberStatus SaberPixelShuffle<AMD, OpDtype>::create(
     const int out_channel = channel / (factor * factor);
     const int count       = inputs[0]->valid_shape().count();
 
-    const Shape old_shape(num, out_channel, factor, factor, height, width);
-    const Shape new_shape(num, out_channel, height, factor, width, factor);
+    const Shape old_shape({num, out_channel, factor, factor, height, width});
+    const Shape new_shape({num, out_channel, height, factor, width, factor});
 
     std::vector<int> old_steps;
     std::vector<int> new_steps;
@@ -136,9 +136,9 @@ SaberStatus SaberPixelShuffle<AMD, OpDtype>::dispatch(
 
     bool err                     = false;
     const int count              = outputs[0]->valid_size();
-    const int* old_steps_p       = _old_steps.data();
-    const int* new_steps_p       = _new_steps.data();
-    const int* permute_order_p   = _permute_order.data();
+    const int* old_steps_p       = (int*)_old_steps.data();
+    const int* new_steps_p       = (int*)_new_steps.data();
+    const int* permute_order_p   = (int*)_permute_order.data();
 
     OpDataType* top_data         = (OpDataType*)outputs[0]->mutable_data();
     OpDataType* bottom_data      = (OpDataType*)inputs[0]->data();
