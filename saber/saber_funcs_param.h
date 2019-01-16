@@ -2848,6 +2848,27 @@ struct CosSimParam{
 };
 
 template <typename TargetType>
+struct PixelShuffleParam {
+    PixelShuffleParam() = default;
+    explicit PixelShuffleParam(int upscale_factor_in)
+        : upscale_factor(upscale_factor_in)
+    {}
+    PixelShuffleParam(const PixelShuffleParam &right)
+        : upscale_factor(right.upscale_factor)
+    {}
+    PixelShuffleParam &operator=(const PixelShuffleParam &right) {
+        upscale_factor = right.upscale_factor;
+        return *this;
+    }
+    bool operator==(const PixelShuffleParam &right) {
+        bool comp_eq = true;
+        comp_eq = comp_eq && (upscale_factor == right.upscale_factor);
+        return comp_eq;
+    }
+    int upscale_factor;
+};
+
+template <typename TargetType>
 struct ProductQuantEmbeddingWithVsumParam {
     ProductQuantEmbeddingWithVsumParam() = default;
     ProductQuantEmbeddingWithVsumParam(size_t word_emb_in,
