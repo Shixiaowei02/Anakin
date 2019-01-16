@@ -5,16 +5,16 @@
    You may obtain a copy of the License at
 
        http://www.apache.org/licenses/LICENSE-2.0
-   
+
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
-   limitations under the License. 
+   limitations under the License.
 */
 
 #ifndef ANAKIN_GRAPH_H
-#define ANAKIN_GRAPH_H 
+#define ANAKIN_GRAPH_H
 
 #include "framework/graph/graph_base.h"
 #include "framework/graph/node.h"
@@ -22,6 +22,7 @@
 #include "framework/graph/llvm/virtual_graph.h"
 #include "framework/core/thread_safe_macros.h"
 #include "framework/graph/graph_global_mem.h"
+#include "framework/core/net/calibrator_parse.h"
 
 namespace anakin {
 
@@ -31,23 +32,25 @@ namespace graph {
  * \brief Graph class
  * public inherit GraphBase
 */
-template<typename Ttype, DataType Dtype, Precision Ptype>
-class Graph : public GraphBase<std::string, 
-                               NodePtr<Ttype, Dtype, Ptype>, 
-                               Tensor4dPtr<Ttype, Dtype>, 
-                               Edge<Ttype, Dtype> > {
+template<typename Ttype, Precision Ptype>
+class Graph : public GraphBase<std::string,
+                               NodePtr,
+                               Tensor4dPtr<Ttype>,
+                               Edge<Ttype> > {
 public:
-    Graph():GraphBase<std::string, 
-                      NodePtr<Ttype, Dtype, Ptype>, 
-                      Tensor4dPtr<Ttype, Dtype>, 
-                      Edge<Ttype, Dtype> >() {}
-    Graph(size_t size):GraphBase<std::string, 
-                                 NodePtr<Ttype, Dtype, Ptype>, 
-                                 Tensor4dPtr<Ttype, Dtype>, 
-                                 Edge<Ttype, Dtype> >(size) {}
+    typedef Arc_iterator<std::string, Tensor4dPtr<Ttype>, Edge<Ttype> > Edge_it_t;
+public:
+    Graph():GraphBase<std::string,
+                      NodePtr,
+                      Tensor4dPtr<Ttype>,
+                      Edge<Ttype> >() {}
+    Graph(size_t size):GraphBase<std::string,
+                                 NodePtr,
+                                 Tensor4dPtr<Ttype>,
+                                 Edge<Ttype> >(size) {}
 
     ~Graph() {
-        if(_vgraph) { 
+        if (_vgraph) {
             delete _vgraph;
             _vgraph = nullptr;
         }
@@ -68,13 +71,14 @@ public:
     virtual bool directed() final { return true; }
 
     /// Parsing from model
-    Status load(std::istream* instream);
-    Status load(std::string model_path); 
+    Status load(std::string model_path);
     Status load(const char*  model_path);
-    Status load(const char* buffer, size_t len);
-
     Status save(std::string model_path);
     Status save(const char*  model_path);
+
+    Status load(const char* buffer, size_t len);
+    void load_calibrator_config(std::string, std::string);
+
     /// Get nodes in execution oroder.
     std::vector<std::string>& get_nodes_in_order();
 
@@ -84,20 +88,20 @@ public:
     void ResetBatchSize(std::string in_name, const int batch_size);
 
 public:
-    /** 
+    /**
      * \brief register out
      *
-     * Note: 
+     * Note:
      *   The outs is the same as edge weight from  node_bottom_name to node_top_name
      *   When register the out edge, all the fusion pattern that have the edge can't be combined
      *   and maybe have an bad impact on the perfermance
      */
     Status RegistOut(std::string node_bottom_name, std::string node_top_name);
-    
-    /** 
+
+    /**
      * \brief register all outs
      *
-     * Note: 
+     * Note:
      *   All the outs will be registered.
      *   This api should be used when you test you model and want to test some edge's tensor inside the graph.
      */
@@ -115,7 +119,11 @@ public:
      * \biref shallow copy of graph
      * note: only copy parameters and architecture, but not the weights
     */
-    Status CopyFrom(Graph<Ttype, Dtype, Ptype>& graph);
+    Status CopyFrom(Graph<Ttype, Ptype>& graph);
+
+    //get all edge scales in graph
+    std::unordered_map<std::string, std::vector<float>> 
+        get_scale_map(); 
 
     ///< statistics stand for Statistics info of anakin graph
     Statistics statistics;
@@ -132,9 +140,9 @@ private:
     ///< _name stand for message
     std::string _name{"default"};
     ///< graph input node name
-    std::vector<std::string> _ins; 
-    ///< graph output node name     
-    std::vector<std::string> _outs;   
+    std::vector<std::string> _ins;
+    ///< graph output node name
+    std::vector<std::string> _outs;
     ///< graph node execute list
     std::vector<std::string> _nodes_exec_order;
     ///< node_merges map: target node map to all its fusion node
@@ -153,12 +161,9 @@ private:
     /// this used to holder the name of target parsed model.
     std::string _model_path{"None"} GUARDED_BY(this->_mut);
     /// this make the graph optimized.
-    bool _has_graph_optimized{false}; GUARDED_BY(this->_mut);
-
-    const char* _buffer{NULL} GUARDED_BY(this->_mut);
-    size_t _len{0} GUARDED_BY(this->_mut);
+    bool _has_graph_optimized{false} GUARDED_BY(this->_mut);
     std::mutex _mut;
-}; 
+};
 
 
 

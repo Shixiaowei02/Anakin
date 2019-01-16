@@ -23,6 +23,10 @@
 #include "framework/core/thread_safe_macros.h"
 #include "framework/core/singleton.h"
 #include "utils/logger/logger.h"
+#include "anakin_config.h"
+#ifdef USE_SGX
+#include <support/sgx/sgx_mutex>
+#endif
 
 namespace anakin {
 
@@ -46,6 +50,7 @@ public:
             LOG(FATAL) << type_id << " 's original "<< ori_type_id << " has not been registered! ";
         } else {
             _container[type_id] = _container[ori_type_id];
+            _type_id_list.push_back(type_id);
         }
     }
     std::vector<TypeIdentifier>& GetTypeIdentifierList() {

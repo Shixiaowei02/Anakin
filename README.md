@@ -1,4 +1,4 @@
-# Anakin
+# Anakin2.0
 
 [![Build Status](https://travis-ci.org/PaddlePaddle/Anakin.svg?branch=developing)](https://travis-ci.org/PaddlePaddle/Anakin)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](LICENSE)
@@ -43,7 +43,7 @@ It is recommended to check out the
 before looking into the
 [build from source guide](docs/Manual/INSTALL_en.md).
 
-For ARM, please refer [run on arm](docs/Manual/run_on_arm_en.md).
+For ARM, please refer [run on arm](tools/anakin-lite/README.md).
 
 ## Benchmark
 It is recommended to check out the [readme of benchmark](benchmark/README.md).

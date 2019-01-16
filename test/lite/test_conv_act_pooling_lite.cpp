@@ -1,5 +1,5 @@
 #include "test_lite.h"
-#include "saber/lite/funcs/saber_conv_act_pooling.h"
+#include "saber/lite/funcs/saber_conv_pooling.h"
 
 using namespace anakin::saber;
 using namespace anakin::saber::lite;
@@ -10,7 +10,7 @@ int threads = 4;
 #define USE_COMPARE
 const bool FLAG_RELU = true;
 
-typedef Tensor<CPU, AK_FLOAT> TensorHf4;
+typedef Tensor<CPU> TensorHf4;
 template <typename Tensor_t>
 void tensor_diff(Tensor_t& t1, Tensor_t& t2, Tensor_t& tdiff) {
 
@@ -37,7 +37,7 @@ void test_arm_conv(std::vector<TensorHf4*>& tin, \
     double min_time = 1000000;
     SaberTimer t1;
 
-    SaberConvActPooling2D conv;
+    SaberConvPooling2D conv;
 
     Context ctx1;
     PowerMode mode = cluster_id == 0? SABER_POWER_HIGH : SABER_POWER_LOW;
@@ -102,11 +102,12 @@ void test_arm_conv(std::vector<TensorHf4*>& tin, \
     if (bias) {
         bias_ptr = &pbias;
     }
-
-    SaberConvActPooling2D conv_lite;
-    ConvActPool2DParam param(pweiht.valid_size(), ch_out, group, \
-        kernel, kernel, stride, stride, pad, pad, dila, dila, bias, Active_relu, true, \
-        Pooling_average_include_padding, true, 1, 1, 1, 1, 1, 1, pweiht.data(), pbias.data());
+    std::vector<float> scale(ch_out, 1.f);
+    SaberConvPooling2D conv_lite;
+    ConvPool2DParam param(pweiht.valid_size(), ch_out, group, \
+        kernel, kernel, stride, stride, pad, pad, dila, dila, bias, AK_FLOAT, pweiht.data(), scale.data(), pbias.data(), \
+        false, true, Active_relu, 0.f, 1.f, false, nullptr, \
+        Pooling_average_include_padding, true, 1, 1, 1, 1, 1, 1, 1);
 //    conv_lite.load_param(pweiht.valid_size(), ch_out, group, \
 //        kernel, kernel, stride, stride, pad, pad, dila, dila, bias, Active_relu, true, \
 //        Pooling_average_include_padding, true, 1, 1, 1, 1, 1, 1, pweiht.data(), pbias.data());

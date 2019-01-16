@@ -25,7 +25,8 @@ class Graph(object):
         elif config.framework == 'PADDLE':
             pass
         elif config.framework == 'LEGO':
-            pass
+            from lego import LegoParser_test
+            self.parser = LegoParser_test(config.framework_config_dict)
         elif config.framework == 'TENSORFLOW':
             from tensorflow import TFParser
             self.parser=TFParser(config.framework_config_dict)
@@ -34,6 +35,9 @@ class Graph(object):
         elif config.framework == 'FLUID':
             from fluid import FluidParser
             self.parser = FluidParser(config.framework_config_dict)
+        elif config.framework == 'ONNX':
+            from onnx import OnnxParser
+            self.parser = OnnxParser(config.framework_config_dict)
         else:
             raise NameError('ERROR: GrapProtoIO not support %s model.' % (config.framework))
         self.graph_io = self.parser()
@@ -95,7 +99,7 @@ class Graph(object):
         """
         return self.graph_io, self.config
 
-    def serialization(self): 
+    def serialization(self):
         """
         serialize to disk
         """

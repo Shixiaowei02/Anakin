@@ -32,6 +32,30 @@ namespace anakin{
 
 namespace cudnn{
 
+struct ParamsRegion {
+
+    ParamsRegion():_offset(NULL), _size(0){};
+    ParamsRegion(void *offset, size_t size):_offset(offset), _size(size){}
+    ~ParamsRegion(){}
+    ParamsRegion(const ParamsRegion &right): _offset(right._offset),_size(right._size){};
+
+    ParamsRegion &operator=(const ParamsRegion &right) {
+        _offset = right._offset;
+        _size=right._size;
+        return *this;
+    }
+    bool operator==(const ParamsRegion &right) {
+        bool comp_eq = true;
+        comp_eq = comp_eq && (_offset == right._offset);
+        comp_eq = comp_eq && (_size == right._size);
+        return  comp_eq;
+    }
+
+    void * _offset;
+    size_t _size;
+};
+
+
 template <typename T>
 class cudnnTypeWrapper;
 
@@ -82,13 +106,14 @@ public:
         return &v;
     }
 };
+
 template <typename T>
 class TensorDescriptors {
 public:
     TensorDescriptors(
             size_t n,
-            const std::vector<int>& dim,
-            const std::vector<int>& stride) {
+            const std::vector<std::vector<int>>& dim,
+            const std::vector<std::vector<int>>& stride) {
         descs_.resize(n);
         CHECK_EQ(dim.size(), stride.size());
         for (auto i = 0; i < n; ++i) {
@@ -96,30 +121,11 @@ public:
             CUDNN_CHECK(cudnnSetTensorNdDescriptor(
                     descs_[i],
                     cudnnTypeWrapper<T>::type,
-                    dim.size(),
-                    dim.data(),
-                    stride.data()));
+                    dim[i].size(),
+                    dim[i].data(),
+                    stride[i].data()));
         }
     }
-    TensorDescriptors(
-            std::vector<int>& batch_vec,
-            const std::vector<int>& dim,
-            const std::vector<int>& stride) {
-        descs_.resize(batch_vec.size() - 1);
-        CHECK_EQ(dim.size(), stride.size());
-        for (auto i = 0; i < batch_vec.size() - 1; ++i) {
-            CUDNN_CHECK(cudnnCreateTensorDescriptor(&descs_[i]));
-            std::vector<int> cur_dim = dim;
-            cur_dim[0] = batch_vec[i+1] - batch_vec[i];
-            CUDNN_CHECK(cudnnSetTensorNdDescriptor(
-                    descs_[i],
-                    cudnnTypeWrapper<T>::type,
-                    cur_dim.size(),
-                    cur_dim.data(),
-                    stride.data()));
-        }
-    }
-    
     ~TensorDescriptors() {
         for (auto desc : descs_) {
             CUDNN_CHECK(cudnnDestroyTensorDescriptor(desc));
@@ -319,6 +325,19 @@ inline void set_nd_pooling_des(cudnnPoolingDescriptor_t* pooling, saber::Pooling
     CUDNN_CHECK(cudnnSetPoolingNdDescriptor(*pooling, mode, CUDNN_NOT_PROPAGATE_NAN,
                     nbDims, windowDImA, paddingA, strideA));
 //    CUDNN_CHECK(cudnnSetPoolingNdDescriptor(*conv, group));
+}
+template <typename Dtype>
+inline void createLrnDesc(cudnnLRNDescriptor_t * desc) {
+
+    CUDNN_CHECK(cudnnCreateLRNDescriptor(desc));
+}
+template <typename Dtype>
+inline void setLrnDesc(cudnnLRNDescriptor_t* desc,
+                        int N,
+                        float alpha,
+                        float beta,
+                        float K) {
+    CUDNN_CHECK(cudnnSetLRNDescriptor(*desc, N, alpha, beta, K));
 }
 
 } // namespace saber

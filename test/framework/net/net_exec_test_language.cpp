@@ -143,22 +143,24 @@ int get_batch_data_offset(
     return len;
 }
 
-void anakin_net_thread(std::vector<Tensor4dPtr<X86, AK_FLOAT> > *data_in,std::string model_path
+void anakin_net_thread(std::vector<Tensor4dPtr<X86> > *data_in,std::string model_path
         ) {
     omp_set_dynamic(0);
     omp_set_num_threads(1);
     mkl_set_num_threads(1);
-    Graph<X86, AK_FLOAT, Precision::FP32> *graph = new Graph<X86, AK_FLOAT, Precision::FP32>();
+    Graph<X86,  Precision::FP32> *graph = new Graph<X86, Precision::FP32>();
             LOG(WARNING) << "load anakin model file from " << model_path << " ...";
     // load anakin model files.
     auto status = graph->load(model_path);
     if(!status ) {
-                LOG(FATAL) << " [ERROR] " << status.info();
+        LOG(FATAL) << " [ERROR] " << status.info();
     }
-    graph->Reshape("input_0", {GLB_max_word_len, 1, 1, 1});
+    Shape input_0_shape({GLB_max_word_len, 1, 1, 1}, Layout_NCHW);
+    graph->Reshape("input_0", input_0_shape);
     //anakin graph optimization
     graph->Optimize();
-    Net<X86, AK_FLOAT, Precision::FP32> net_executer(*graph, true);
+    int count = 1;
+    Net<X86, Precision::FP32> net_executer(*graph, true);
 //    SaberTimer<X86> timer;
 //    Context<X86> ctx;
     struct timeval time_start,time_end;
@@ -171,14 +173,16 @@ void anakin_net_thread(std::vector<Tensor4dPtr<X86, AK_FLOAT> > *data_in,std::st
         auto input_tensor=(*data_in)[i];
         auto word_in_p = net_executer.get_in("input_0");
         int len_sum=input_tensor->valid_size();
-        word_in_p->reshape({len_sum, 1, 1, 1});
+        Shape word_in_shape({len_sum, 1, 1, 1}, Layout_NCHW);
+        word_in_p->reshape(word_in_shape);
         word_sum+=len_sum;
         for (int j = 0; j < len_sum; ++j) {
-            word_in_p->mutable_data()[j] = input_tensor->data()[j];
+            ((float*)word_in_p->mutable_data())[j] = ((float*)input_tensor->data())[j];
         }
         word_in_p->set_seq_offset(input_tensor->get_seq_offset());
 //        timer.start(ctx);
         net_executer.prediction();
+        count ++;
 //        timer.end(ctx);
         if(i%slice_10==0)
             LOG(INFO)<<"thread run "<<i<<" of "<<data_in->size();
@@ -186,6 +190,10 @@ void anakin_net_thread(std::vector<Tensor4dPtr<X86, AK_FLOAT> > *data_in,std::st
     gettimeofday(&time_end, nullptr);
     float use_ms=(time_end.tv_sec-time_start.tv_sec)*1000.f+(time_end.tv_usec-time_start.tv_usec)/1000.f;
     LOG(INFO)<<"summary_thread :thread total : "<<use_ms<<" ms, avg = "<<(use_ms/data_in->size())<<", consume words = "<<word_sum;
+#ifdef ENABLE_OP_TIMER
+    net_executer.print_and_reset_optime_summary(count);
+#endif
+
     free(graph);
 }
 #define ONE_THREAD 1
@@ -213,21 +221,21 @@ TEST(NetTest, net_execute_base_test) {
     int real_max_batch_word_len=0;
 
 
-    std::vector<std::vector<Tensor<X86, AK_FLOAT>* >> host_tensor_p_in_list;
+    std::vector<std::vector<Tensor<X86 >* >> host_tensor_p_in_list;
     for(int tid=0;tid<thread_num;++tid){
-        std::vector<Tensor<X86, AK_FLOAT>* > data4thread;
+        std::vector<Tensor<X86>* > data4thread;
         int start_wordid=tid*(word_idx.size()/thread_num);
         int end_wordid=(tid+1)*(word_idx.size()/thread_num);
         for (int i = start_wordid; i < end_wordid; i+=batch_num) {
             int word_len = get_batch_data_offset(word_idx_data, word_idx, word_seq_offset, i, batch_num);
             real_max_batch_word_len=real_max_batch_word_len<word_len?word_len:real_max_batch_word_len;
-            saber::Shape valid_shape({word_len, 1, 1, 1});
-            Tensor4d<X86, AK_FLOAT>* tensor_p=new Tensor4d<X86, AK_FLOAT>(valid_shape);
+            saber::Shape valid_shape({word_len, 1, 1, 1}, Layout_NCHW);
+            Tensor4d<X86>* tensor_p=new Tensor4d<X86>(valid_shape);
                     CHECK_EQ(word_len,word_idx_data.size())<<"word_len == word_idx_data.size";
             for (int j = 0; j < word_idx_data.size(); ++j) {
-                tensor_p->mutable_data()[j] = word_idx_data[j];
+                ((float*)tensor_p->mutable_data())[j] = word_idx_data[j];
             }
-            tensor_p->set_seq_offset(word_seq_offset);
+            tensor_p->set_seq_offset({word_seq_offset});
             data4thread.push_back(tensor_p);
         }
         host_tensor_p_in_list.push_back(data4thread);
@@ -250,7 +258,6 @@ TEST(NetTest, net_execute_base_test) {
 //        threads.emplace_back(
 //                new std::thread(&anakin_net_thread, &host_tensor_p_in_list[i]),models[0]);
     }
-
     for (int i = 0; i < thread_num; ++i) {
         threads[i]->join();
     }

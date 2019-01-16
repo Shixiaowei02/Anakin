@@ -78,18 +78,14 @@ endmacro()
 # ----------------------------------------------------------------------------
 macro(anakin_find_cudnn)
 	set(CUDNN_ROOT "" CACHE PATH "CUDNN root dir.")
-  	find_path(CUDNN_INCLUDE_DIR cudnn.h PATHS ${CUDNN_ROOT} ${CUDNN_ROOT}/include
+  	find_path(CUDNN_INCLUDE_DIR cudnn.h PATHS ${CUDNN_ROOT} 
 						  $ENV{CUDNN_ROOT} 
 						  $ENV{CUDNN_ROOT}/include
-						  $ENV{CUDNN_INCLUDE_DIR}
 						  ${ANAKIN_ROOT}/third-party/cudnn/include NO_DEFAULT_PATH)
-    message(STATUS "cudnn include header is ${CUDNN_INCLUDE_DIR}/cudnn.h")
     if(BUILD_SHARED)
         find_library(CUDNN_LIBRARY NAMES libcudnn.so 
                                PATHS ${CUDNN_INCLUDE_DIR}/../lib64/ ${CUDNN_INCLUDE_DIR}/
-						                   $ENV{CUDNN_LIBRARY}
                                DOC "library path for cudnn.") 
-        message(STATUS "cudnn library is ${CUDNN_LIBRARY}/libcudnn.so")
     else()
         find_library(CUDNN_LIBRARY NAMES libcudnn_static.a
                                PATHS ${CUDNN_INCLUDE_DIR}/../lib64/
@@ -138,6 +134,7 @@ macro(anakin_find_cuda)
     	set(CUDA_BUILD_CUBIN ON) # defauld OFF
     endif()
 	find_package(CUDA 7.5 REQUIRED)
+    set(CUDA_HOST_COMPILER ${CMAKE_C_COMPILER})
     if(BUILD_SHARED)
 	    if(CUDA_FOUND)
 	    	include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
@@ -147,6 +144,9 @@ macro(anakin_find_cuda)
 	    	if(USE_CURAND)
 	    		list(APPEND ANAKIN_LINKER_LIBS ${CUDA_curand_LIBRARY})
 	    	endif()
+            if(BUILD_RPC) 
+                list(APPEND ANAKIN_LINKER_LIBS ${CUDA_INCLUDE_DIRS}/../lib64/stubs/libnvidia-ml.so) 
+            endif()
 	    	list(APPEND ANAKIN_LINKER_LIBS ${CUDA_CUDART_LIBRARY})
 	    else()
 	    	message(FATAL_ERROR "Cuda SHARED lib Could not found !")	

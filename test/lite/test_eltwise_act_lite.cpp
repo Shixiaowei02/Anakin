@@ -14,7 +14,7 @@ int threads = 4;
 int act_type = 2;
 int elt_type = 1;
 
-typedef Tensor<CPU, AK_FLOAT> TensorHf4;
+typedef Tensor<CPU> TensorHf4;
 
 #define COMPARE_RESULT 1
 
@@ -30,10 +30,10 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
     int num = tensor_in[0]->num();
     int size_in = w_in * h_in;
 
-    float* data_out = tensor_out.mutable_data();
-    const float* data_in0 = tensor_in[0]->data();
-    const float* data_in1 = tensor_in[1]->data();
-    
+    float* data_out = (float*)tensor_out.mutable_data();
+    const float* data_in0 = (const float*)tensor_in[0]->data();
+    const float* data_in1 = (const float*)tensor_in[1]->data();
+
     if (op_type == 1){ //Operation_PROD
         for (int n = 0; n < num; n++){
             float* data_out_batch = data_out + n * ch_in * size_in;
@@ -47,8 +47,8 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                 const float* data_in1_channel = data_in1_batch + c * size_in;
                 for (int i = 0; i < size_in; i++){
                     data_out_channel[i] = data_in0_channel[i] * data_in1_channel[i];
-                    if(act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
-                    if(act_type == 10){
+                    if (act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
+                    if (act_type == 10){
                         data_out_channel[i] = data_out_channel[i] < 0 ? \
                             (channel_shared ? data_out_channel[i] * slope_ptr[0] : data_out_channel[i] * slope_ptr[c]) : data_out_channel[i];
                     }
@@ -56,7 +56,7 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
             }
         }
         for (int b = 2; b <tensor_in.size(); b++){
-            const float* data_in = tensor_in[b]->data();
+            const float* data_in = (const float*)tensor_in[b]->data();
             for (int n = 0; n < num; n++){
                 float* data_out_batch = data_out + n * ch_in * size_in;
                 const float* data_in_batch = data_in + n * ch_in * size_in;
@@ -67,8 +67,8 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                     const float* data_in_channel = data_in_batch + c * size_in;
                     for (int i = 0; i < size_in; i++){
                         data_out_channel[i] = data_out_channel[i] * data_in_channel[i];
-                        if(act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
-                        if(act_type == 10){
+                        if (act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
+                        if (act_type == 10){
                         data_out_channel[i] = data_out_channel[i] < 0 ? \
                             (channel_shared ? data_out_channel[i] * slope_ptr[0] : data_out_channel[i] * slope_ptr[c]) : data_out_channel[i];
                         }
@@ -91,8 +91,8 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                     const float* data_in1_channel = data_in1_batch + c * size_in;
                     for (int i = 0; i < size_in; i++){
                         data_out_channel[i] = data_in0_channel[i] + data_in1_channel[i];
-                        if(act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
-                        if(act_type == 10){
+                        if (act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
+                        if (act_type == 10){
                         data_out_channel[i] = data_out_channel[i] < 0 ? \
                             (channel_shared ? data_out_channel[i] * slope_ptr[0] : data_out_channel[i] * slope_ptr[c]) : data_out_channel[i];
                         }
@@ -100,7 +100,7 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                 }
             }
             for (int b = 2; b <tensor_in.size(); b++){
-                const float* data_in = tensor_in[b]->data();
+                const float* data_in = (const float*)tensor_in[b]->data();
                 for (int n = 0; n < num; n++){
                     float* data_out_batch = data_out + n * ch_in * size_in;
                     const float* data_in_batch = data_in + n * ch_in * size_in;
@@ -111,8 +111,8 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                         const float* data_in_channel = data_in_batch + c * size_in;
                         for (int i = 0; i < size_in; i++){
                             data_out_channel[i] = data_out_channel[i] + data_in_channel[i];
-                            if(act_type ==2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
-                            if(act_type == 10){
+                            if (act_type ==2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
+                            if (act_type == 10){
                                 data_out_channel[i] = data_out_channel[i] < 0 ? \
                                     (channel_shared ? data_out_channel[i] * slope_ptr[0] : data_out_channel[i] * slope_ptr[c]) : data_out_channel[i];
                             }
@@ -132,10 +132,10 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                     const float* data_in0_channel = data_in0_batch + c * size_in;
                     const float* data_in1_channel = data_in1_batch + c * size_in;
                     for (int i = 0; i < size_in; i++){
-                        data_out_channel[i] = data_in0_channel[i]*coeffs_ptr[0] + \ 
+                        data_out_channel[i] = data_in0_channel[i]*coeffs_ptr[0] + \
                         data_in1_channel[i]*coeffs_ptr[1];
-                        if(act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
-                        if(act_type == 10){
+                        if (act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
+                        if (act_type == 10){
                             data_out_channel[i] = data_out_channel[i] < 0 ? \
                             (channel_shared ? data_out_channel[i] * slope_ptr[0] : data_out_channel[i] * slope_ptr[c]) : data_out_channel[i];
                         }
@@ -143,7 +143,7 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                 }
             }
             for (int b = 2; b <tensor_in.size(); b++){
-                const float* data_in = tensor_in[b]->data();
+                const float* data_in = (const float*)tensor_in[b]->data();
                 for (int n = 0; n < num; n++){
                     float* data_out_batch = data_out + n * ch_in * size_in;
                     const float* data_in_batch = data_in + n * ch_in * size_in;
@@ -153,10 +153,10 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                         float* data_out_channel = data_out_batch + c * size_in;
                         const float* data_in_channel = data_in_batch + c * size_in;
                         for (int i = 0; i < size_in; i++){
-                            data_out_channel[i] = data_out_channel[i] + \ 
+                            data_out_channel[i] = data_out_channel[i] + \
                             data_in_channel[i] * coeffs_ptr[b];
-                            if(act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
-                            if(act_type == 10){
+                            if (act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
+                            if (act_type == 10){
                                 data_out_channel[i] = data_out_channel[i] < 0 ? \
                                 (channel_shared ? data_out_channel[i] * slope_ptr[0] : data_out_channel[i] * slope_ptr[c]) : data_out_channel[i];
                             }
@@ -179,8 +179,8 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                 const float* data_in1_channel = data_in1_batch + c * size_in;
                 for (int i = 0; i < size_in; i++){
                     data_out_channel[i] = std::max(data_in0_channel[i], data_in1_channel[i]);
-                    if(act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
-                    if(act_type == 10){
+                    if (act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
+                    if (act_type == 10){
                         data_out_channel[i] = data_out_channel[i] < 0 ? \
                             (channel_shared ? data_out_channel[i] * slope_ptr[0] : data_out_channel[i] * slope_ptr[c]) : data_out_channel[i];
                     }
@@ -188,7 +188,7 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
             }
         }
         for (int b = 2; b <tensor_in.size(); b++){
-            const float* data_in = tensor_in[b]->data();
+            const float* data_in = (const float*)tensor_in[b]->data();
             for (int n = 0; n < num; n++){
                 float* data_out_batch = data_out + n * ch_in * size_in;
                 const float* data_in_batch = data_in + n * ch_in * size_in;
@@ -199,8 +199,8 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
                     const float* data_in_channel = data_in_batch + c * size_in;
                     for (int i = 0; i < size_in; i++){
                         data_out_channel[i] = std::max(data_out_channel[i], data_in_channel[i]);
-                        if(act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
-                        if(act_type == 10){
+                        if (act_type == 2)data_out_channel[i] = data_out_channel[i] > 0 ? data_out_channel[i] : 0.f;
+                        if (act_type == 10){
                         data_out_channel[i] = data_out_channel[i] < 0 ? \
                             (channel_shared ? data_out_channel[i] * slope_ptr[0] : data_out_channel[i] * slope_ptr[c]) : data_out_channel[i];
                         }
@@ -209,7 +209,7 @@ void eltwise_active_basic(const Context &ctx, TensorHf4& tensor_out, \
             }
         }
     }
-    
+
 }
 
 void test_eltwise_act(std::vector<TensorHf4*>& tin, int operation, \
@@ -290,17 +290,17 @@ TensorHf4 tout_basic;
 
     LOG(INFO) << "run basic eltwise active for precision comparation";
     tout_basic.re_alloc(shape_out);
-   
+
     to = 0;
     for (int i = 0; i < test_iter; ++i) {
         t1.clear();
         t1.start();
-        if(act_type == 2)
+        if (act_type == 2)
             eltwise_active_basic(ctx1, tout_basic, tin, operation, coeffs_ptr, num_coeff, act_type, false, nullptr);
-        if(act_type == 10){
+        if (act_type == 10){
             eltwise_active_basic(ctx1, tout_basic, tin, operation, coeffs_ptr, num_coeff, act_type, false, tslop.data());
         }
-        
+
         //tvout_basic[0] ->record_event(ctx1.get_compute_stream());
         //tvout_basic[0] ->sync();
         t1.end();
@@ -312,14 +312,14 @@ TensorHf4 tout_basic;
     LOG(INFO) << "basic eltwise running time, ave: " << to / test_iter << ", min time: " << min_time;
    // print_tensor_host(tout_basic);
 #endif
-    
+
     SaberEltwiseAct eltwise_act_saber;
-    EltwiseActParam eltwise_act_param(operation, coeffs_ptr, act_type, 0.f, 1.f, false, tslop.data());
+    EltwiseActParam eltwise_act_param((EltwiseType)operation, coeffs_ptr, (ActiveType)act_type, 0.f, 1.f, false, tslop.data(), shape.count());
    // ParamBase* base =new EltwiseActParam(operation, coeffs_ptr, act_type, 0.f, 1.f, false, tslop.data());
     LOG(INFO) << "saber eltwise act load param";
     eltwise_act_saber.load_param(&eltwise_act_param);
     //LITE_CHECK(eltwise_act_saber.load_param(&eltwise_act_param));
-    
+
     LOG(INFO) << "saber eltwise act compute output shape";
     eltwise_act_saber.compute_output_shape(tin, tvout_saber);
 
@@ -389,7 +389,7 @@ TEST(TestSaberLite, test_func_eltwise_act_lite) {
    // PoolingType type = 1;
 
     Shape shape_in(num, chin, hin, win);
-    
+
     //fill_tensor_host_const(tdin, 1.f);
 
     std::vector<TensorHf4*> tin;
@@ -399,13 +399,13 @@ TEST(TestSaberLite, test_func_eltwise_act_lite) {
     TensorHf4 tdin1;
     tdin1.re_alloc(shape_in);
     fill_tensor_rand(tdin1, -1.f, 1.f);
-    
+
     tin.push_back(&tdin);
     tin.push_back(&tdin1);
-    
-    
+
+
     std::vector<float> coeffs_ptr;
-   
+
     coeffs_ptr.push_back(1.0f);
     coeffs_ptr.push_back(1.0f);
     //printf("test_arm_eltwise: GLB_operation: %d \n", GLB_operation);
@@ -434,7 +434,7 @@ int main(int argc, const char** argv){
     if (argc >= 6 ) {
         act_type = atoi(argv[5]);
     }
-    if(argc >= 7) {
+    if (argc >= 7) {
         if (argc < 10) {
             LOG(ERROR) << "usage: ./" << argv[0] << " cluster  threads  test_iter " << \
                 " elt_type act_type num ch_in h_in w_in";

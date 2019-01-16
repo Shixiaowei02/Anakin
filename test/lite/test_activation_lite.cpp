@@ -12,47 +12,101 @@ int num_in = 9;
 int cluster = 0;
 int threads = 4;
 ActiveType active_type=Active_relu;
-typedef Tensor<CPU, AK_FLOAT> TensorHf4;
+typedef Tensor<CPU> TensorHf4;
 
 #define COMPARE_RESULT 1
 
-void activation_basic(TensorHf4& tin,ActiveType active_type,TensorHf4& tout,bool shared =false , float* slopes =nullptr) {
-    switch (active_type) {
+template <typename dtype>
+void activation_basic(const TensorHf4& tin, TensorHf4& tout, ActivationParam& param) {
+
+    int num = tin.num();
+    int channel = tin.channel();
+    int height = tin.height();
+    int width = tin.width();
+
+    dtype* dout = (dtype*)tout.mutable_data();
+    const dtype* din = (const dtype*)tin.data();
+    int count = tin.valid_size();
+    int size = height * width;
+
+    switch (param._act_type) {
+        //x > 0 ? x : 0
         case Active_relu:
-            for (int i = 0; i < tin.size(); ++i) {
-                tout.mutable_data()[i] = (tin.data()[i] >= 0) ? tin.data()[i] : 0;
+            for (size_t i = 0; i < count; i++) {
+                dout[i] = din[i] > 0 ? din[i] : 0;
             }
+
             break;
-        case Active_tanh:
-            for (int i = 0; i < tin.size(); ++i) {
-                tout.mutable_data()[i] = (exp(tin.data()[i])-exp(-tin.data()[i]))/(exp(tin.data()[i])+exp(-tin.data()[i]));
-            }
-            break;
+
+            // sigmoid: 1/(exp(-x) + 1)
         case Active_sigmoid:
-            for (int i = 0; i < tin.size(); ++i) {
-                tout.mutable_data()[i] = 1/(1+exp(-tin.data()[i]));
+
+            for (size_t i = 0; i < count; i++) {
+                dout[i] = 1.0f / (exp(-din[i]) + 1.0f);
             }
+
             break;
+
+            // tanh : (exp(x) - exp(-x)) / (exp(x) + exp(-x))
+        case Active_tanh:
+            for (size_t i = 0; i < count; i++) {
+                dout[i] =  tanh(din[i]);//(exp(din[i]) - exp(-din[i])) / (exp(din[i]) + exp(-din[i]));
+            }
+
+            break;
+
+            // stanh : b * \frac{e^{a * x} - e^{-a * x}}{e^{a * x} + e^{-a * x}}
+        case Active_stanh:
+            for (size_t i = 0; i < count; i++) {
+                dtype val = din[i] * param._neg_slope;
+                dout[i] =  param._coef * tanh(val);
+            }
+
+            break;
+
+            // x > 0 ? x : 0;
+            // x < threshold ? x : threshold
+        case Active_clipped_relu:
+            for (size_t i = 0; i < count; i++) {
+                const dtype threshold = param._coef;
+                dout[i] = din[i] > 0 ? (din[i] < threshold ? din[i] : threshold) : 0;
+            }
+
+            break;
+
+            //elu:  x > 0 ? x : coef * (exp(x) - 1)
+        case Active_elu:
+            for (size_t i = 0; i < count; i++) {
+                dout[i] =  din[i] > 0 ? din[i] : param._coef * (exp(din[i]) - 1);
+            }
+
+            break;
+
+
+            //prelu: x > 0 ? x : slope[c] * x
         case Active_prelu:
-            for (int i = 0; i < num_in; ++i) {
-                for (int j=0; j<ch_in; ++j) {
-                    float slope = shared ? slopes[0] : slopes[j];
-                    for(int k=0;k<w_in*h_in;++k){
-                        int offset=i*ch_in*w_in*h_in+j*w_in*h_in+k;
-                        if(tin.data()[offset]<0.f){
-                            tout.mutable_data()[offset] = tin.data()[offset]*slope;
-                        }else{
-                            tout.mutable_data()[offset] = tin.data()[offset];
-                        }
+            for (int n = 0; n < num; n++) {
+                const dtype* in_ptr = din + n * channel * size;
+                dtype* out_ptr = dout + n * channel * size;
+
+                // const dtype *slope_ptr = (const dtype*)prelu_param.slope->data();
+                for (int c = 0; c < channel; c++) {
+                    const dtype* in_ch_ptr = in_ptr + c * size;
+                    dtype* out_ch_ptr = out_ptr + c * size;
+                    float slope = param._prelu_channel_shared? param._prelu_weights[0] : \
+                                  param._prelu_weights[c];
+
+                    for (int k = 0; k < size; k++) {
+                        out_ch_ptr[k] = in_ch_ptr[k] > 0 ? in_ch_ptr[k] : in_ch_ptr[k] * slope;
                     }
                 }
             }
             break;
         default:
-            LOG(ERROR)<<"error activation type!";
-            break;
+            LOG(FATAL) << "unsupported activation type: " << param._act_type;
     }
 }
+
 TEST(TestSaberLite, test_func_activation_arm) {
     // start Reshape & doInfer
     Context ctx1;
@@ -68,7 +122,7 @@ TEST(TestSaberLite, test_func_activation_arm) {
 #endif
     }
 
-   
+
 
     Shape shape_in(num_in, ch_in, h_in, w_in);
     Shape shape_out = shape_in;
@@ -76,27 +130,27 @@ TEST(TestSaberLite, test_func_activation_arm) {
     LOG(INFO) << " input tensor size, num=" << num_in << ", channel=" << \
         ch_in << ", height=" << h_in << ", width=" << w_in;
 
-    std::vector<TensorHf4*> vin;
-    std::vector<TensorHf4*> vout;
-
-    Tensor<CPU, AK_FLOAT> thin(shape_in);
-    fill_tensor_rand(thin, -1.f, 1.f);
-    TensorHf4 tout;
-    TensorHf4 tout_basic(shape_out);
-    vin.push_back(&thin);
     SaberActivation activation_lite;
     float slopes[ch_in];
     for (int i=0; i<ch_in; ++i) {
         slopes[i]=0.1f*i;
     }
+    ActivationParam param(active_type, 0.f, 1.0f, true, slopes);
+    activation_lite.load_param(&param);
+
+    std::vector<TensorHf4*> vin;
+    std::vector<TensorHf4*> vout;
+
+    Tensor<CPU> thin(shape_in);
+    fill_tensor_rand(thin, -1.f, 1.f);
+    TensorHf4 tout;
+    TensorHf4 tout_basic(shape_out);
+    vin.push_back(&thin);
+
 #if COMPARE_RESULT
-    activation_basic(thin, active_type, tout_basic,true,slopes);
+    activation_basic<float>(thin, tout_basic, param);
     //print_tensor_host(tout_basic);
 #endif
-    
-    
-    ActivationParam param(active_type, 0.f, 1.0f,true,slopes);
-    activation_lite.load_param(&param);
 
     vout.push_back(&tout);
     activation_lite.compute_output_shape(vin, vout);
@@ -129,8 +183,8 @@ TEST(TestSaberLite, test_func_activation_arm) {
 #if COMPARE_RESULT
     double max_ratio = 0;
     double max_diff = 0;
-  
-    tensor_cmp_host(tout_basic.data(), tout.data(), tout_basic.valid_size(), max_ratio, max_diff);
+
+    tensor_cmp_host(tout_basic, tout, max_ratio, max_diff);
     LOG(INFO) << "compare result, max diff: " << max_diff << ", max ratio: " << max_ratio;
     CHECK_EQ(fabsf(max_ratio) < 1e-5f, true) << "compute result error";
 #endif

@@ -3,8 +3,8 @@
 using namespace anakin::saber;
 using namespace anakin::saber::lite;
 
-typedef Tensor<CPU, AK_FLOAT> Tensor4f;
-//typedef Tensor<ARM, AK_FLOAT, HW> Tensor2f;
+typedef Tensor<CPU> Tensor4f;
+//typedef Tensor<ARM, HW> Tensor2f;
 
 TEST(TestSaberLite, test_tensor_constructor) {
 
@@ -30,7 +30,7 @@ TEST(TestSaberLite, test_tensor_constructor) {
 //! test tensor shape() function
     LOG(INFO) << "|--test tensor shape() function";
     Shape sho = thost0.shape();
-    LOG(INFO) << "|--shape of tensor: " << sho[0] << ", " << sho[1] << "," << sho[2] << "," <<sho[3];
+    LOG(INFO) << "|--shape of tensor: " << sho[0] << ", " << sho[1] << "," << sho[2] << "," << sho[3];
     LOG(INFO) << "|--test get tensor n, c, h, w function, num = " \
         << thost0.num() << ", channel = " << thost0.channel() << ", height = " \
         << thost0.height() << ", width = " << thost0.width();
@@ -127,7 +127,7 @@ TEST(TestSaberLite, test_tensor_constructor) {
     LOG(INFO) << "|--show root tensor while data is changed by shared tensor";
     print_tensor(thost3);
     print_tensor(thost6);
-    print_tensor_valid(thost6);
+    //print_tensor_valid(thost6);
 }
 #if 0
 TEST(TestSaberTensorARM, test_tensor_deepcopy) {

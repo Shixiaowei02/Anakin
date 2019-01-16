@@ -46,7 +46,7 @@ endfunction()
 # recursively fetch include dir 
 function(anakin_fetch_include_recursively root_dir)
     if (IS_DIRECTORY ${root_dir})
-		#message(STATUS "include dir: " ${Magenta}${root_dir}${ColourReset})
+        #message(STATUS "include dir: " ${Magenta}${root_dir}${ColourReset})
 		include_directories(${root_dir})
     endif()
 
@@ -64,7 +64,19 @@ function(anakin_judge_avx   outputs)
 			OUTPUT_VARIABLE OUTPUT
 			RETURN_VALUE VALUE)
 	message("it is anakin_judge_avx " OUTPUT)
-	set(${outputs} ${${outputs}} PARENT_SCOPE)
+	set(${outputs} ${OUTPUT} PARENT_SCOPE)
+endfunction()
+
+function(anakin_get_cpu_arch   outputs)
+	if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+		set(${outputs} native PARENT_SCOPE)
+	else()
+		exec_program("${CMAKE_CXX_COMPILER} -c -Q -march=native --help=target | grep march | cut -d '=' -f 2 | tr -d '\\040\\011\\012\\015' |cut -d '#' -f 1"
+				OUTPUT_VARIABLE OUTPUT
+				RETURN_VALUE VALUE)
+
+		set(${outputs} ${OUTPUT} PARENT_SCOPE)
+	endif ()
 endfunction()
 # ----------------------------------------------------------------------------
 # section: help to detect the compiler options
@@ -118,7 +130,7 @@ macro(anakin_check_compiler_flag LANG FLAG RESULT)
         endif()
       elseif(_fname AND _fname MATCHES "src.cu")
             MESSAGE(STATUS "Testing ${RESULT}")
-            EXEC_PROGRAM(nvcc #${CUDA_NVCC_EXECUTABLE} 
+            EXEC_PROGRAM(nvcc
                          ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/
                          ARGS "${FLAG}" "${_fname}" 
                          OUTPUT_VARIABLE OUTPUT 
@@ -233,65 +245,6 @@ function(anakin_generate_kernel anakin_root_dir)
 	else()
 	    message(FATAL_ERROR "anakin_generate_kernel\npath: ${kerel_generate_script_path}\nscript: generate.sh ")
 	endif()
-endfunction()
-
-
-# ----------------------------------------------------------------------------
-# section: generate the protobuf .h and .cpp files.
-# ----------------------------------------------------------------------------
-function(anakin_protos_processing)
-	set(PROTO_SRC_PATH ${ANAKIN_MODEL_PARSER}/proto)
-	set(__working_dir ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/PROTO_TEMP/)
-	
-	anakin_fetch_files_with_suffix(${PROTO_SRC_PATH} "proto" PROTO_SRC_FILES)
-	foreach(__file ${PROTO_SRC_FILES})
-		if(USE_ARM_PLACE)
-			exec_program(protoc ${__working_dir} ARGS " -I=${PROTO_SRC_PATH} --cpp_out=. ${__file}"
-					OUTPUT_VARIABLE OUTPUT
-					RETURN_VALUE VALUE)
-		else()
-			exec_program(${PROTOBUF_PROTOC_EXECUTABLE} ${__working_dir} ARGS " -I=${PROTO_SRC_PATH} --cpp_out=. ${__file}"
-							OUTPUT_VARIABLE OUTPUT
-							RETURN_VALUE VALUE)
-		endif()
-		if(NOT VALUE)
-			anakin_fetch_files_with_suffix(${__working_dir} "h" PROTO_GENERATE_H)
-			# get *.cpp or *.cc
-			anakin_fetch_files_with_suffix(${__working_dir} "c*" PROTO_GENERATE_C)
-			foreach(__include_file ${PROTO_GENERATE_H})
-				exec_program(mv ARGS ${__include_file} ${PROTO_SRC_PATH}
-								OUTPUT_VARIABLE __out
-								RETURN_VALUE __value)
-			endforeach()
-			foreach(__src_file ${PROTO_GENERATE_C})
-				if(POLICY CMP0007)
-					cmake_policy(PUSH)
-  					cmake_policy(SET CMP0007 NEW)
-				endif()
-				string(REPLACE "." ";" SRC_LIST ${__src_file})				
-				list(GET SRC_LIST -1 __src_file_name_suffix)
-				list(GET SRC_LIST -3 __src_file_name)
-
-				string(REPLACE "/" ";" SRC_LIST_PATH ${__src_file_name})
-				list(GET SRC_LIST_PATH -1 __pure_src_file_name)
-
-				if(__src_file_name_suffix EQUAL "cpp")
-					set(__full_src_filename "${__pure_src_file_name}.pb.cpp")
-				else()
-					set(__full_src_filename "${__pure_src_file_name}.pb.cc")
-				endif()
-				#message(STATUS " first ---> ${__working_dir}${__full_src_filename} ${ANAKIN_ROOT}/src/${__pure_src_file_name}.pb.cpp")
-				exec_program(mv ARGS " ${__working_dir}${__full_src_filename}  ${PROTO_SRC_PATH}/${__pure_src_file_name}.pb.cpp" 
-								OUTPUT_VARIABLE __out
-								RETURN_VALUE __value)
-				if(POLICY CMP0007)
-  					cmake_policy(POP)
-				endif()
-			endforeach()
-		else()
-			message(FATAL_ERROR "anakin_protos_processing : ${__file} \n error msg: ${OUTPUT}")
-		endif()
-	endforeach()
 endfunction()
 
 # ----------------------------------------------------------------------------

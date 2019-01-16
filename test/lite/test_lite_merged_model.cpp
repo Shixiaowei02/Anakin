@@ -4,7 +4,7 @@
 
 using namespace anakin::saber;
 using namespace anakin::saber::lite;
-typedef Tensor<CPU, AK_FLOAT> TensorHf;
+typedef Tensor<CPU> TensorHf;
 
 std::string lite_model;
 int FLAGS_num = 1;
@@ -12,13 +12,19 @@ int FLAGS_warmup_iter = 1;
 int FLAGS_epoch = 1;
 int FLAGS_threads = 1;
 int FLAGS_cluster = 0;
+bool FLAGS_set_archs = false;
+ARMArch FLAGS_arch = A73;
 
 TEST(TestSaberLite, test_lite_model) {
     //! create net, with power mode and threads
     Net net((PowerMode)FLAGS_cluster, FLAGS_threads);
     //! you can also set net param according to your device
     net.set_run_mode((PowerMode)FLAGS_cluster, FLAGS_threads);
-    //net.set_device_cache(32000, 1000000);
+    if (FLAGS_set_archs) {
+        net.set_device_arch(FLAGS_arch);
+        LOG(INFO) << "arm arc: " << FLAGS_arch;
+    }
+    net.set_device_cache(32 * 1024, 512* 1024);
     //! load merged model
     SaberStatus flag = net.load_model(lite_model.c_str());
     CHECK_EQ(flag, SaberSuccess) << "load model: " << lite_model << " failed";
@@ -29,9 +35,12 @@ TEST(TestSaberLite, test_lite_model) {
     for (int i = 0; i < vtin.size(); ++i) {
         TensorHf* tin = vtin[i];
         //! reshape input before prediction
+        Shape shin = tin->valid_shape();
+        shin[0] = FLAGS_num;
+        tin->reshape(shin);
         //tin->reshape(Shape(1, 3, 224, 224));
         LOG(INFO) << "input tensor size: ";
-        Shape shin = tin->valid_shape();
+        //Shape shin = tin->valid_shape();
         for (int j = 0; j < tin->dims(); ++j) {
             LOG(INFO) << "|---: " << shin[j];
         }
@@ -107,6 +116,8 @@ int main(int argc, const char** argv){
     // initial logger
     logger::init(argv[0]);
 
+    Env::env_init();
+
     LOG(INFO)<< "usage:";
     LOG(INFO)<< argv[0] << " <lite model> <num> <warmup_iter> <epoch>";
     LOG(INFO)<< "   lite_model:     path to anakin lite model";
@@ -121,26 +132,34 @@ int main(int argc, const char** argv){
     }
     lite_model = argv[1];
 
-    if(argc > 2) {
+    if (argc > 2) {
         FLAGS_num = atoi(argv[2]);
     }
-    if(argc > 3) {
+    if (argc > 3) {
         FLAGS_warmup_iter = atoi(argv[3]);
     }
-    if(argc > 4) {
+    if (argc > 4) {
         FLAGS_epoch = atoi(argv[4]);
     }
-    if(argc > 5) {
+    if (argc > 5) {
         FLAGS_cluster = atoi(argv[5]);
         if (FLAGS_cluster < 0) {
             FLAGS_cluster = 0;
         }
-        if (FLAGS_cluster > 3) {
-            FLAGS_cluster = 3;
+        if (FLAGS_cluster > 5) {
+            FLAGS_cluster = 5;
         }
     }
-    if(argc > 6) {
+    if (argc > 6) {
         FLAGS_threads = atoi(argv[6]);
+    }
+    if (argc > 7) {
+        FLAGS_set_archs = true;
+        if (atoi(argv[7]) > 0) {
+            FLAGS_arch = (ARMArch)atoi(argv[7]);
+        } else {
+            FLAGS_arch = ARM_UNKOWN;
+        }
     }
     InitTest();
     RUN_ALL_TESTS(argv[0]); 

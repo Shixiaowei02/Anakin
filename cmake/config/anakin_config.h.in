@@ -27,7 +27,8 @@
 // build options
 #cmakedefine ENABLE_DEBUG
 
-// boost
+#cmakedefine RECORD_TENSOR_IN_NET
+
 #cmakedefine USE_BOOST
 
 #cmakedefine USE_CUBLAS
@@ -52,12 +53,19 @@
 
 #cmakedefine USE_GFLAGS
 
-// plantform to use
+#cmakedefine USE_MIOPENGEMM
+
+// platform to use
 #cmakedefine USE_GPU_PLACE
 
 #cmakedefine USE_X86_PLACE
+#cmakedefine BUILD_X86_ARCH "@BUILD_X86_ARCH@"
 
 #cmakedefine USE_ARM_PLACE
+
+#cmakedefine USE_BM_PLACE
+
+#cmakedefine USE_SGX
 
 #cmakedefine TARGET_ANDROID
 
@@ -67,13 +75,23 @@
 
 #cmakedefine NVIDIA_GPU
 
+#cmakedefine AMD_GPU 
+
 #cmakedefine ENABLE_STACKTRACES
 
 #cmakedefine SUPPORT_PTHREADS
 
+#cmakedefine USE_NANOPB
+
 // build arm lite
 #cmakedefine BUILD_LITE
 
+// for AMD profiling computing performance
+#cmakedefine ENABLE_AMD_PROFILING
+
+#cmakedefine ENABLE_AMD_DEBUG
+
+#cmakedefine ENABLE_AMD_DO_SEARCH
 
 #if defined(ANDROID) || defined(__ANDROID__)
     #define PLATFORM_ANDROID
@@ -105,4 +123,3 @@
 #endif
 
 #endif
-

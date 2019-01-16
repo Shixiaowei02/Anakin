@@ -16,7 +16,7 @@
 #ifndef ANAKIN_SABER_CORE_EVENTS_H
 #define ANAKIN_SABER_CORE_EVENTS_H
 
-#include "saber/core/target_wrapper.h"
+#include "core/target_wrapper.h"
 
 namespace anakin{
 
@@ -30,7 +30,7 @@ public:
      * \brief create target specific event
      */
     explicit Events(){
-        API::create_event(_event);
+        API::create_event(&_event);
     }
 
     /**

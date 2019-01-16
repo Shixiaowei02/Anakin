@@ -18,40 +18,25 @@
 
 #include "saber/funcs/base.h"
 #include "saber/funcs/impl/impl_shuffle_channel.h"
+#ifdef NVIDIA_GPU
+#include "saber/funcs/impl/cuda/saber_shuffle_channel.h"
+#endif
 
 namespace anakin {
 
 namespace saber {
 
-template<typename TargetType,
-        DataType OpDtype,
-        DataType inDtype = AK_FLOAT,
-        DataType outDtype = AK_FLOAT,
-        typename LayOutType_op = NCHW,
-        typename LayOutType_in = NCHW,
-        typename LayOutType_out = NCHW
->
-class ShuffleChannel : public BaseFunc<
-        Tensor<TargetType, inDtype, LayOutType_in>,
-        Tensor<TargetType, outDtype, LayOutType_out>,
-        Tensor<TargetType, OpDtype, LayOutType_op>,
-        ImplBase,
-        ShuffleChannelParam
-> {
+template <typename TargetType, DataType OpDtype>
+class ShuffleChannel : public BaseFunc<TargetType, OpDtype, ImplBase, ShuffleChannelParam> {
 public:
-    using BaseFunc<
-            Tensor<TargetType, inDtype, LayOutType_in>,
-            Tensor<TargetType, outDtype, LayOutType_out>,
-            Tensor<TargetType, OpDtype, LayOutType_op>,
-            ImplBase,
-            ShuffleChannelParam>::BaseFunc;
+    using BaseFunc<TargetType, OpDtype, ImplBase, ShuffleChannelParam >::BaseFunc;
 
     ShuffleChannel() = default;
 
-    typedef Tensor<TargetType, inDtype, LayOutType_in> InDataTensor;
-    typedef Tensor<TargetType, outDtype, LayOutType_out> OutDataTensor;
-    typedef Tensor<TargetType, OpDtype, LayOutType_op> OpTensor;
-    typedef ShuffleChannelParam<OpTensor> Param_t;
+    typedef Tensor<TargetType> InDataTensor;
+    typedef Tensor<TargetType> OutDataTensor;
+    typedef Tensor<TargetType> OpTensor;
+    typedef ShuffleChannelParam<TargetType> Param_t;
     typedef std::vector<InDataTensor *> Input_v;
     typedef std::vector<OutDataTensor *> Output_v;
     typedef std::vector<Shape> Shape_v;
@@ -60,6 +45,9 @@ public:
         Param_t& param) override {
 
         SaberStatus status;
+        if (input[0]->channel() % param.group != 0) {
+            return SaberInvalidValue;
+        }
         for (int i = 0; i < input.size(); ++i) {
             Shape output_shape = input[i]->valid_shape();
             output[i]->set_shape(output_shape);
@@ -70,13 +58,11 @@ public:
     virtual SaberStatus init_impl(ImplEnum implenum) override {
         switch (implenum) {
             case VENDER_IMPL:
-                this->_impl.push_back(new VenderShuffleChannel <TargetType, OpDtype, inDtype, outDtype,
-                LayOutType_op, LayOutType_in, LayOutType_out>);
+                this->_impl.push_back(new VenderShuffleChannel <TargetType, OpDtype>);
                 return SaberSuccess;
 
             case SABER_IMPL:
-                this->_impl.push_back(new SaberShuffleChannel <TargetType, OpDtype, inDtype, outDtype,
-                LayOutType_op, LayOutType_in, LayOutType_out>);
+                this->_impl.push_back(new SaberShuffleChannel <TargetType, OpDtype>);
                 return SaberSuccess;
 
             default:

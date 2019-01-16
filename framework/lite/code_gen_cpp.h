@@ -16,6 +16,7 @@
 #ifndef ANAKIN_FRAMEWORK_LITE_CODE_GENERATE_CPP_H
 #define ANAKIN_FRAMEWORK_LITE_CODE_GENERATE_CPP_H
 
+#include "saber/lite/core/common_lite.h"
 #include "framework/lite/op_map.h"
 #include "framework/lite/code_gen_base.h"
 
@@ -27,11 +28,13 @@ namespace lite {
  *  \brief class to generate cpp files.
  *
  */
-template<typename Ttype, DataType Dtype, Precision Ptype>
-class GenCPP : public CodeGenBase<Ttype, Dtype, Ptype> {
+template<typename Ttype, Precision Ptype>
+class GenCPP : public CodeGenBase<Ttype, Ptype> {
 public:
-	explicit GenCPP(std::string model_name, std::string model_dir, bool flag_aot) {
-        _flag_aot = flag_aot;
+	explicit GenCPP(std::string model_name, std::string model_dir, std::string precision_path, \
+		std::string calibrator_path, bool lite_mode, bool flag_aot) {
+		
+		_flag_aot = flag_aot;
         if (!flag_aot) {
             _cpp_file_name = model_dir + '/' + model_name + ".cpp.tmp";
             _h_file_name = model_dir + '/' + model_name + ".h.tmp";
@@ -44,6 +47,9 @@ public:
             _code_name = model_name;
             _g_weights_ptr_name = _code_name+"_weights_ptr";
             _merge_opt_file = model_dir + '/' + model_name + ".lite.bin";
+            _precision_path = precision_path;
+            _calibrator_path = calibrator_path;
+            _lite_mode = lite_mode;
         } else {
 
             _cpp_file_name = model_dir + '/' + model_name + ".cpp";
@@ -59,6 +65,9 @@ public:
             _g_weights_ptr_name = _code_name+"_weights_ptr";
 
             _merge_opt_file = model_dir + '/' + model_name + ".merge.tmp";
+            _precision_path = precision_path;
+            _calibrator_path = calibrator_path;
+            _lite_mode = lite_mode;
         }
 
 	}
@@ -152,6 +161,9 @@ private:
 	std::string _g_weights_ptr_name;
 	std::string _weight_opt_file;
     std::string _merge_opt_file;
+    std::string _precision_path;
+    std::string _calibrator_path;
+	bool _lite_mode;
 
 	CodeWritter _code;
 	CodeWritter _opt_param_write;

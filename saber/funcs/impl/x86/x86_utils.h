@@ -1,28 +1,33 @@
-/* Copyright (c) 2016 Anakin Authors All Rights Reserve.
+/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
 
-   http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License. */
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ */
 
-#ifndef X86_UTILS_H
-#define X86_UTILS_H
+
+#ifndef SABER_FUNCS_IMPL_X86_X86_UTILS_H
+#define SABER_FUNCS_IMPL_X86_X86_UTILS_H
 
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <assert.h>
-#include "core/common.h"
-#include "saber/core/tensor.h"
-#include "mkl_cblas.h"
 
+#include <type_traits>
+
+#include "saber/core/common.h"
+#include "saber/core/tensor.h"
+#include "saber/funcs/saber_util.h"
 
 namespace anakin {
 namespace saber {
@@ -35,6 +40,7 @@ namespace saber {
 #endif
 
 namespace utils {
+
 
 /* a bunch of std:: analogues to be compliant with any msvs version
  *
@@ -59,12 +65,24 @@ public:
         printf("\n");
     }
 };
+template<typename opTensor>
+static inline void try_expand_clean_tensor(opTensor& tensor, anakin::saber::Shape shape) {
+    if (utils::try_expand_tensor(tensor, shape)) {
+        memset(tensor.mutable_data(), 0, tensor.valid_size()* type_length(tensor.get_dtype()));
+    };
+}
 
 class AlignedUtils {
 public:
     template <typename Dtype>
     void aligned_last_dim(const Dtype* input, Dtype* output, int input_size, int ori_last_dim,
                           int aligned_dim) {
+        for (int row = 0; row < input_size / ori_last_dim; row++) {
+            for (int col = ori_last_dim; col < aligned_dim; col++) {
+                output[row * aligned_dim + col] = static_cast<Dtype>(0);
+            }
+        }
+
         for (int i = 0; i < input_size; i++) {
             int row = i / ori_last_dim;
             int col = i % ori_last_dim;
@@ -217,11 +235,11 @@ public:
 
         int target_word_id = 0;
         std::vector<int> length_vec_cnt = length_vec;
-
+        int last_batch_size = batch_size;
         for (int word_id_in_seq = 0; word_id_in_seq < max_len; word_id_in_seq++) {
             emit_offset_vec[word_id_in_seq] = target_word_id;
 
-            for (int batch_id = 0; batch_id < batch_size; batch_id++) {
+            for (int batch_id = 0; batch_id < last_batch_size; batch_id++) {
                 int old_batch_id = _length_index[batch_id];
 
                 if (length_vec_cnt[old_batch_id] > 0) {
@@ -237,7 +255,7 @@ public:
                     length_vec_cnt[old_batch_id]--;
                     target_word_id++;
                 } else {
-
+                    last_batch_size--;
                     break;
                 }
             }
@@ -265,11 +283,6 @@ inline int round_up(int k, int c) {
 inline int div_up(int k, int c) {
     return (k + c - 1) / c;
 }
-
-template<bool expr, class T = void> struct enable_if {};
-template<class T> struct enable_if<true, T> {
-    typedef T type;
-};
 
 /* analogue std::conditional */
 template <bool, typename, typename> struct conditional {};
@@ -302,16 +315,6 @@ template <typename U, U t, U f> struct conditional_v<false, U, t, f> {
     static constexpr U value = f;
 };
 
-template <typename T> struct remove_reference {
-    typedef T type;
-};
-template <typename T> struct remove_reference<T&> {
-    typedef T type;
-};
-template <typename T> struct remove_reference < T&& > {
-    typedef T type;
-};
-
 template<typename T>
 inline const T& min(const T& a, const T& b) {
     return a < b ? a : b;
@@ -323,17 +326,8 @@ inline const T& max(const T& a, const T& b) {
 }
 
 template <typename T>
-inline T&& forward(typename utils::remove_reference<T>::type& t) {
-    return static_cast < T && >(t);
-}
-template <typename T>
-inline T&& forward(typename utils::remove_reference<T>::type&& t) {
-    return static_cast < T && >(t);
-}
-
-template <typename T>
-inline typename remove_reference<T>::type zero() {
-    auto zero = typename remove_reference<T>::type();
+inline typename std::remove_reference<T>::type zero() {
+    auto zero = typename std::remove_reference<T>::type();
     return zero;
 }
 
@@ -419,18 +413,18 @@ inline R array_product(const T* arr, size_t size) {
 }
 
 template <typename T, typename U>
-inline typename remove_reference<T>::type div_up(const T a, const U b) {
+inline typename std::remove_reference<T>::type div_up(const T a, const U b) {
     assert(b);
     return (a + b - 1) / b;
 }
 
 template <typename T, typename U>
-inline typename remove_reference<T>::type rnd_up(const T a, const U b) {
+inline typename std::remove_reference<T>::type rnd_up(const T a, const U b) {
     return div_up(a, b) * b;
 }
 
 template <typename T, typename U>
-inline typename remove_reference<T>::type rnd_dn(const T a, const U b) {
+inline typename std::remove_reference<T>::type rnd_dn(const T a, const U b) {
     return (a / b) * b;
 }
 
@@ -446,80 +440,6 @@ inline U this_block_size(const T offset, const U max, const V block_size) {
     } else {
         return block_size;
     }
-}
-
-
-
-template <typename T, typename U>
-inline void balance211(T n, U team, U tid, T& n_start, T& n_end) {
-    T n_min = 1;
-    T& n_my = n_end;
-
-    if (team <= 1 || n == 0) {
-        n_start = 0;
-        n_my = n;
-    } else if (n_min == 1) {
-        // team = T1 + T2
-        // n = T1*n1 + T2*n2  (n1 - n2 = 1)
-        T n1 = div_up(n, (T)team);
-        T n2 = n1 - 1;
-        T T1 = n - n2 * (T)team;
-        n_my = (T)tid < T1 ? n1 : n2;
-        n_start = (T)tid <= T1 ? tid * n1 : T1 * n1 + ((T)tid - T1) * n2;
-    }
-
-    n_end += n_start;
-}
-
-template<typename T>
-inline T nd_iterator_init(T start) {
-    return start;
-}
-template<typename T, typename U, typename W, typename... Args>
-inline T nd_iterator_init(T start, U& x, const W& X, Args&& ... tuple) {
-    start = nd_iterator_init(start, utils::forward<Args>(tuple)...);
-    x = start % X;
-    return start / X;
-}
-
-inline bool nd_iterator_step() {
-    return true;
-}
-template<typename U, typename W, typename... Args>
-inline bool nd_iterator_step(U& x, const W& X, Args&& ... tuple) {
-    if (nd_iterator_step(utils::forward<Args>(tuple)...)) {
-        x = (x + 1) % X;
-        return x == 0;
-    }
-
-    return false;
-}
-
-template<typename U, typename W, typename Y>
-inline bool nd_iterator_jump(U& cur, const U end, W& x, const Y& X) {
-    U max_jump = end - cur;
-    U dim_jump = X - x;
-
-    if (dim_jump <= max_jump) {
-        x = 0;
-        cur += dim_jump;
-        return true;
-    } else {
-        cur += max_jump;
-        x += max_jump;
-        return false;
-    }
-}
-
-template<typename U, typename W, typename Y, typename... Args>
-inline bool nd_iterator_jump(U& cur, const U end, W& x, const Y& X,
-                             Args&& ... tuple) {
-    if (nd_iterator_jump(cur, end, utils::forward<Args>(tuple)...)) {
-        x = (x + 1) % X;
-        return x == 0;
-    }
-
-    return false;
 }
 
 template <typename Telem, size_t Tdims>
@@ -608,10 +528,15 @@ struct c_compatible {
 inline void yield_thread() { }
 
 // reorder weight layout from NCHW(oc, ic, kh, kw) to OIhw16i16o
-inline void weight_reorder_OIhw16i16o(Tensor<X86, AK_FLOAT, NCHW>& input,
-                                      Tensor<X86, AK_FLOAT, NCHW>& output) {
+inline void weight_reorder_OIhw16i16o(Tensor<X86>& input,
+                                      Tensor<X86>& output) {
+    CHECK_EQ(input.get_dtype(), AK_FLOAT) << "only support float type";
+    CHECK_EQ(output.get_dtype(), AK_FLOAT) << "only support float type";
     Shape shape = input.valid_shape();
     int oc_value = shape[0], ic_value = shape[1], kh_value = shape[2], kw_value = shape[3];
+
+    float* output_ptr = static_cast<float*>(output.mutable_data());
+    const float* input_ptr = static_cast<const float*>(input.data());
     #pragma omp parallel for collapse(6) schedule(static)
 
     for (int oc_idx = 0; oc_idx < oc_value / 16; ++oc_idx) {
@@ -628,7 +553,7 @@ inline void weight_reorder_OIhw16i16o(Tensor<X86, AK_FLOAT, NCHW>& input,
                                              kh * kw_value * 16 * 16 +
                                              kw * 16 * 16 + ic * 16 + oc;
 
-                            *(output.mutable_data() + output_idx) = *(input.data() + input_idx);
+                            *(output_ptr + output_idx) = *(input_ptr + input_idx);
                         }
                     }
                 }
@@ -637,10 +562,180 @@ inline void weight_reorder_OIhw16i16o(Tensor<X86, AK_FLOAT, NCHW>& input,
     }
 }
 
-// reorder weight layout from NCHW(oc, ic, kh, kw) to OIhwi16o
-inline void weight_reorder_OIhwi16o(Tensor<X86, AK_FLOAT, NCHW>& input,
-                                    Tensor<X86, AK_FLOAT, NCHW>& output) {
+// reorder weight layout from NCHW(oc, ic, kh, kw) to OIhw8i8o
+inline void weight_reorder_OIhw8i8o(Tensor<X86>& input,
+                                    Tensor<X86>& output) {
+    CHECK_EQ(input.get_dtype(), AK_FLOAT) << "only support float type";
+    CHECK_EQ(output.get_dtype(), AK_FLOAT) << "only support float type";
+    Shape shape = input.valid_shape();
+    int oc_value = shape[0], ic_value = shape[1], kh_value = shape[2], kw_value = shape[3];
+
+    Shape new_shape({utils::round_up(oc_value, 8), utils::round_up(ic_value, 8), kh_value, kw_value},
+                    Layout_NCHW);
+
+    if ((oc_value % 8 != 0) || (ic_value % 8 != 0)) {
+        output.re_alloc(new_shape, AK_FLOAT);
+    }
+
+    float* output_ptr = static_cast<float*>(output.mutable_data());
+    const float* input_ptr = static_cast<const float*>(input.data());
+    #pragma omp parallel for collapse(6) schedule(static)
+
+    for (int oc_idx = 0; oc_idx < new_shape[0] / 8; ++oc_idx) {
+        for (int ic_idx = 0; ic_idx < new_shape[1] / 8; ++ic_idx) {
+            for (int kh = 0; kh < kh_value; ++kh) {
+                for (int kw = 0; kw < kw_value; ++kw) {
+                    for (int ic = 0; ic < 8; ++ic) {
+                        for (int oc = 0; oc < 8; ++oc) {
+                            int input_idx = (oc_idx * 8 + oc) * ic_value * kh_value * kw_value +
+                                            (ic_idx * 8 + ic) * kh_value * kw_value +
+                                            kh * kw_value + kw;
+                            int output_idx = oc_idx * new_shape[1] / 8 * kh_value * kw_value * 8 * 8 +
+                                             ic_idx * kh_value * kw_value * 8 * 8 +
+                                             kh * kw_value * 8 * 8 +
+                                             kw * 8 * 8 + ic * 8 + oc;
+
+                            *(output_ptr + output_idx) = ((oc_idx * 8 + oc) < oc_value && (ic_idx * 8 + ic) < ic_value)
+                                                         ?  *(input_ptr + input_idx) : 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// reorder weight layout from NCHW(oc, ic, kh, kw) to OIhw8i8o
+inline void weight_reorder_nchw2nchw8o8i(Tensor<X86>& input,
+                                Tensor<X86>& output) {
+    CHECK_EQ(input.get_dtype(), AK_FLOAT) << "only support float type";
+    CHECK_EQ(output.get_dtype(), AK_FLOAT) << "only support float type";
+    Shape shape = input.valid_shape();
+    int oc_value = shape[0], ic_value = shape[1], kh_value = shape[2], kw_value = shape[3];
+
+    Shape new_shape({utils::round_up(oc_value, 8), utils::round_up(ic_value, 8), kh_value, kw_value},
+                    Layout_NCHW);
+
+    if ((oc_value % 8 != 0) || (ic_value % 8 != 0)) {
+        output.re_alloc(new_shape, AK_FLOAT);
+    }
+
+    float* output_ptr = static_cast<float*>(output.mutable_data());
+    const float* input_ptr = static_cast<const float*>(input.data());
+    #pragma omp parallel for collapse(6) schedule(static)
+
+    for (int oc_idx = 0; oc_idx < new_shape[0] / 8; ++oc_idx) {
+        for (int ic_idx = 0; ic_idx < new_shape[1] / 8; ++ic_idx) {
+            for (int kh = 0; kh < kh_value; ++kh) {
+                for (int kw = 0; kw < kw_value; ++kw) {
+                    for (int oc = 0; oc < 8; ++oc){
+                        for (int ic = 0; ic < 8; ++ic)
+                        {
+                            int input_idx = (oc_idx * 8 + oc) * ic_value * kh_value * kw_value +
+                                            (ic_idx * 8 + ic) * kh_value * kw_value +
+                                            kh * kw_value + kw;
+                            int output_idx = oc_idx * new_shape[1] / 8 * kh_value * kw_value * 8 * 8 +
+                                             ic_idx * kh_value * kw_value * 8 * 8 +
+                                             kh * kw_value * 8 * 8 +
+                                             kw * 8 * 8 + oc * 8 + ic;
+
+                            *(output_ptr + output_idx) = ((oc_idx * 8 + oc) < oc_value && (ic_idx * 8 + ic) < ic_value)
+                                                         ?  *(input_ptr + input_idx) : 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+// reorder weight layout from NCHW(oc, ic, kh, kw) to OIhw4i16o4i
+inline void weight_reorder_OIhw4i16o4i(Tensor<X86>& input, Tensor<X86>& output,
+                                       const std::vector<float>& scale) {
+    CHECK_EQ(input.get_dtype(), AK_INT8) << "only support int8 type";
+    CHECK_EQ(output.get_dtype(), AK_INT8) << "only support int8 type";
     Shape shape = input.shape();
+    int oc_value = shape[0], ic_value = shape[1], kh_value = shape[2], kw_value = shape[3];
+
+    if (input.get_dtype() == AK_FLOAT && output.get_dtype() == AK_INT8) {
+        char* output_ptr = static_cast<char*>(output.mutable_data());
+        const float* input_ptr = static_cast<const float*>(input.data());
+
+        #pragma omp parallel for collapse(7) schedule(static)
+
+        for (int oc_idx = 0; oc_idx < oc_value / 16; ++oc_idx) {
+            for (int ic_idx = 0; ic_idx < ic_value / 16; ++ic_idx) {
+                for (int kh = 0; kh < kh_value; ++kh) {
+                    for (int kw = 0; kw < kw_value; ++kw) {
+                        for (int ic = 0; ic < 4; ++ic) {
+                            for (int oc = 0; oc < 16; ++oc) {
+                                for (int icc = 0; icc < 4; ++icc) {
+                                    int input_idx = (oc_idx * 16 + oc) * ic_value * kh_value * kw_value +
+                                                    (ic_idx * 16 + ic * 4 + icc) * kh_value * kw_value +
+                                                    kh * kw_value + kw;
+                                    int output_idx = oc_idx * ic_value / 16 * kh_value * kw_value * 16 * 16 +
+                                                     ic_idx * kh_value * kw_value * 16 * 16 +
+                                                     kh * kw_value * 16 * 16 +
+                                                     kw * 16 * 16 +
+                                                     ic * 16 * 4 +
+                                                     oc * 4 +
+                                                     icc;
+                                    float scale_v = scale[oc_idx * 16 + oc];
+                                    *(output_ptr + output_idx) = (*(input_ptr + input_idx)) * scale_v;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else if (input.get_dtype() == AK_INT8 && output.get_dtype() == AK_INT8) {
+        char* output_ptr = static_cast<char*>(output.mutable_data());
+        const char* input_ptr = static_cast<const char*>(input.data());
+
+        #pragma omp parallel for collapse(7) schedule(static)
+
+        for (int oc_idx = 0; oc_idx < oc_value / 16; ++oc_idx) {
+            for (int ic_idx = 0; ic_idx < ic_value / 16; ++ic_idx) {
+                for (int kh = 0; kh < kh_value; ++kh) {
+                    for (int kw = 0; kw < kw_value; ++kw) {
+                        for (int ic = 0; ic < 4; ++ic) {
+                            for (int oc = 0; oc < 16; ++oc) {
+                                for (int icc = 0; icc < 4; ++icc) {
+                                    int input_idx = (oc_idx * 16 + oc) * ic_value * kh_value * kw_value +
+                                                    (ic_idx * 16 + ic * 4 + icc) * kh_value * kw_value +
+                                                    kh * kw_value + kw;
+                                    int output_idx = oc_idx * ic_value / 16 * kh_value * kw_value * 16 * 16 +
+                                                     ic_idx * kh_value * kw_value * 16 * 16 +
+                                                     kh * kw_value * 16 * 16 +
+                                                     kw * 16 * 16 +
+                                                     ic * 16 * 4 +
+                                                     oc * 4 +
+                                                     icc;
+                                    *(output_ptr + output_idx) = (*(input_ptr + input_idx));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        ABORT_S() << "error: not support weight reorder!";
+    }
+}
+
+// reorder weight layout from NCHW(oc, ic, kh, kw) to OIhwi16o
+inline void weight_reorder_OIhwi16o(Tensor<X86>& input,
+                                    Tensor<X86>& output) {
+
+    CHECK_EQ(input.get_dtype(), AK_FLOAT) << "only support float type";
+    CHECK_EQ(output.get_dtype(), AK_FLOAT) << "only support float type";
+    Shape shape = input.shape();
+
+    float* output_ptr = static_cast<float*>(output.mutable_data());
+    const float* input_ptr = static_cast<const float*>(input.data());
     #pragma omp parallel for collapse(5) schedule(static)
 
     for (int oc_idx = 0; oc_idx < shape[0] / 16; ++oc_idx) {
@@ -656,7 +751,7 @@ inline void weight_reorder_OIhwi16o(Tensor<X86, AK_FLOAT, NCHW>& input,
                                          kw * shape[1] * 16 +
                                          ic * 16 + oc;
 
-                        *(output.mutable_data() + output_idx) = *(input.data() + input_idx);
+                        *(output_ptr + output_idx) = *(input_ptr + input_idx);
                     }
                 }
             }
@@ -664,28 +759,36 @@ inline void weight_reorder_OIhwi16o(Tensor<X86, AK_FLOAT, NCHW>& input,
     }
 }
 
+inline void weight_reorder_OIhwi8o(Tensor<X86>& input,
+                                   Tensor<X86>& output) {
+    CHECK_EQ(input.get_dtype(), AK_FLOAT) << "only support float type";
+    CHECK_EQ(output.get_dtype(), AK_FLOAT) << "only support float type";
 
-// reorder weight layout from NCHW(oc, ic, kh, kw) to OIhwi8o
-inline void weight_reorder_OIhwi8o(Tensor<X86, AK_FLOAT, NCHW>& input,
-                                   Tensor<X86, AK_FLOAT, NCHW>& output) {
     Shape shape = input.shape();
+    int oc_value = shape[0], ic_value = shape[1], kh_value = shape[2], kw_value = shape[3];
+
+    Shape new_shape({utils::round_up(oc_value, 8)/8, ic_value, kh_value, kw_value, 8}, Layout_NCHW_C8);
+
+    if(oc_value % 8 != 0) {
+        output.re_alloc(new_shape, AK_FLOAT);
+    }
+    float* output_ptr = static_cast<float*>(output.mutable_data());
+    const float* input_ptr = static_cast<const float*>(input.data());
 
     #pragma omp parallel for collapse(5) schedule(static)
-
-    for (int oc_idx = 0; oc_idx < shape[0] / 8; ++oc_idx) {
-        for (int kh = 0; kh < shape[2]; ++kh) {
-            for (int kw = 0; kw < shape[3]; ++kw) {
-                for (int ic = 0; ic < shape[1]; ++ic) {
+    for (int oc_idx = 0; oc_idx < new_shape[0]; ++oc_idx) {
+        for (int kh = 0; kh < kh_value; ++kh) {
+            for (int kw = 0; kw < kw_value; ++kw) {
+                for (int ic = 0; ic < ic_value; ++ic) {
                     for (int oc = 0; oc < 8; ++oc) {
-                        int input_idx = (oc_idx * 8 + oc) * shape[1] * shape[2] * shape[3] +
-                                        ic * shape[2] * shape[3] +
-                                        kh * shape[3] + kw;
-                        int output_idx = oc_idx * shape[2] * shape[3] * shape[1] * 8 +
-                                         kh * shape[3] * shape[1] * 8 +
-                                         kw * shape[1] * 8 +
+                        int input_idx = (oc_idx * 8 + oc) * ic_value * kh_value * kw_value +
+                                        ic * kh_value * kw_value +
+                                        kh * kw_value + kw;
+                        int output_idx = oc_idx * kh_value * kw_value * ic_value * 8 +
+                                         kh * kw_value * ic_value * 8 +
+                                         kw * ic_value * 8 +
                                          ic * 8 + oc;
-
-                        *(output.mutable_data() + output_idx) = *(input.data() + input_idx);
+                        *(output_ptr + output_idx) = ((oc_idx * 8 + oc) < oc_value)? *(input_ptr + input_idx) : 0;
                     }
                 }
             }
@@ -694,36 +797,345 @@ inline void weight_reorder_OIhwi8o(Tensor<X86, AK_FLOAT, NCHW>& input,
 }
 
 // reorder weight layout from NCHW to Goihw16g
-static void weight_reorder_Goihw16g(Tensor<X86, AK_FLOAT, NCHW>& input,
-                                    Tensor<X86, AK_FLOAT, NCHW>& output) {
+static void weight_reorder_Goihw16g(Tensor<X86>& input,
+                                    Tensor<X86>& output) {
     Shape shape = input.shape();
     int g_value = shape[0], oc_value = shape[1], ic_value = shape[1], kh_value = shape[2],
         kw_value = shape[3];
-    #pragma omp parallel for collapse(6) schedule(static)
 
-    for (int g_idx = 0; g_idx < g_value / 16; ++g_idx) {
-        for (int oc_idx = 0; oc_idx < oc_value; ++oc_idx) {
-            for (int ic_idx = 0; ic_idx < ic_value; ++ic_idx) {
-                for (int kh = 0; kh < kh_value; ++kh) {
-                    for (int kw = 0; kw < kw_value; ++kw) {
-                        for (int g = 0; g < 16; ++g) {
-                            int input_idx = (g_idx * 16 + g) * oc_value * ic_value * kh_value * kw_value +
-                                            oc_idx * ic_value * kh_value * kw_value +
-                                            ic_idx * kh_value * kw_value +
-                                            kh * kw_value + kw;
-                            int output_idx = g_idx * oc_value * ic_value * kh_value * kw_value * 16 +
-                                             oc_idx * ic_value * kh_value * kw_value * 16 +
-                                             ic_idx * kh_value * kw_value * 16 +
-                                             kh * kw_value * 16 + kw * 16 + g;
+    if (input.get_dtype() == AK_FLOAT && output.get_dtype() == AK_FLOAT) {
+        float* output_ptr = static_cast<float*>(output.mutable_data());
+        const float* input_ptr = static_cast<const float*>(input.data());
 
-                            *(output.mutable_data() + output_idx) = *(input.data() + input_idx);
+        #pragma omp parallel for collapse(6) schedule(static)
+
+        for (int g_idx = 0; g_idx < g_value / 16; ++g_idx) {
+            for (int oc_idx = 0; oc_idx < oc_value; ++oc_idx) {
+                for (int ic_idx = 0; ic_idx < ic_value; ++ic_idx) {
+                    for (int kh = 0; kh < kh_value; ++kh) {
+                        for (int kw = 0; kw < kw_value; ++kw) {
+                            for (int g = 0; g < 16; ++g) {
+                                int input_idx = (g_idx * 16 + g) * oc_value * ic_value * kh_value * kw_value +
+                                                oc_idx * ic_value * kh_value * kw_value +
+                                                ic_idx * kh_value * kw_value +
+                                                kh * kw_value + kw;
+                                int output_idx = g_idx * oc_value * ic_value * kh_value * kw_value * 16 +
+                                                 oc_idx * ic_value * kh_value * kw_value * 16 +
+                                                 ic_idx * kh_value * kw_value * 16 +
+                                                 kh * kw_value * 16 + kw * 16 + g;
+
+                                *(output_ptr + output_idx) = *(input_ptr + input_idx);
+                            }
                         }
+                    }
+                }
+            }
+        }
+    } else if (input.get_dtype() == AK_INT8 && output.get_dtype() == AK_INT8) {
+        char* output_ptr = static_cast<char*>(output.mutable_data());
+        const char* input_ptr = static_cast<const char*>(input.data());
+
+        #pragma omp parallel for collapse(6) schedule(static)
+
+        for (int g_idx = 0; g_idx < g_value / 16; ++g_idx) {
+            for (int oc_idx = 0; oc_idx < oc_value; ++oc_idx) {
+                for (int ic_idx = 0; ic_idx < ic_value; ++ic_idx) {
+                    for (int kh = 0; kh < kh_value; ++kh) {
+                        for (int kw = 0; kw < kw_value; ++kw) {
+                            for (int g = 0; g < 16; ++g) {
+                                int input_idx = (g_idx * 16 + g) * oc_value * ic_value * kh_value * kw_value +
+                                                oc_idx * ic_value * kh_value * kw_value +
+                                                ic_idx * kh_value * kw_value +
+                                                kh * kw_value + kw;
+                                int output_idx = g_idx * oc_value * ic_value * kh_value * kw_value * 16 +
+                                                 oc_idx * ic_value * kh_value * kw_value * 16 +
+                                                 ic_idx * kh_value * kw_value * 16 +
+                                                 kh * kw_value * 16 + kw * 16 + g;
+
+                                *(output_ptr + output_idx) = *(input_ptr + input_idx);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        ABORT_S() << "error: not supported reorder!";
+    }
+}
+
+// reorder weight layout from NCHW to Goihw8g
+static void weight_reorder_Goihw8g(Tensor<X86>& input,
+                                    Tensor<X86>& output) {
+    Shape shape = input.shape();
+    int g_value = shape[0], oc_value = shape[1], ic_value = shape[1], kh_value = shape[2],
+        kw_value = shape[3];
+
+    if (input.get_dtype() == AK_FLOAT && output.get_dtype() == AK_FLOAT) {
+        float* output_ptr = static_cast<float*>(output.mutable_data());
+        const float* input_ptr = static_cast<const float*>(input.data());
+
+        #pragma omp parallel for collapse(6) schedule(static)
+        for (int g_idx = 0; g_idx < g_value / 8; ++g_idx) {
+            for (int oc_idx = 0; oc_idx < oc_value; ++oc_idx) {
+                for (int ic_idx = 0; ic_idx < ic_value; ++ic_idx) {
+                    for (int kh = 0; kh < kh_value; ++kh) {
+                        for (int kw = 0; kw < kw_value; ++kw) {
+                            for (int g = 0; g < 8; ++g) {
+                                int input_idx = (g_idx * 8 + g) * oc_value * ic_value * kh_value * kw_value +
+                                                oc_idx * ic_value * kh_value * kw_value +
+                                                ic_idx * kh_value * kw_value +
+                                                kh * kw_value + kw;
+                                int output_idx = g_idx * oc_value * ic_value * kh_value * kw_value * 8 +
+                                                 oc_idx * ic_value * kh_value * kw_value * 8 +
+                                                 ic_idx * kh_value * kw_value * 8 +
+                                                 kh * kw_value * 8 + kw * 8 + g;
+
+                                *(output_ptr + output_idx) = *(input_ptr + input_idx);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else if (input.get_dtype() == AK_INT8 && output.get_dtype() == AK_INT8) {
+        char* output_ptr = static_cast<char*>(output.mutable_data());
+        const char* input_ptr = static_cast<const char*>(input.data());
+
+        #pragma omp parallel for collapse(6) schedule(static)
+        for (int g_idx = 0; g_idx < g_value / 8; ++g_idx) {
+            for (int oc_idx = 0; oc_idx < oc_value; ++oc_idx) {
+                for (int ic_idx = 0; ic_idx < ic_value; ++ic_idx) {
+                    for (int kh = 0; kh < kh_value; ++kh) {
+                        for (int kw = 0; kw < kw_value; ++kw) {
+                            for (int g = 0; g < 8; ++g) {
+                                int input_idx = (g_idx * 8 + g) * oc_value * ic_value * kh_value * kw_value +
+                                                oc_idx * ic_value * kh_value * kw_value +
+                                                ic_idx * kh_value * kw_value +
+                                                kh * kw_value + kw;
+                                int output_idx = g_idx * oc_value * ic_value * kh_value * kw_value * 8 +
+                                                 oc_idx * ic_value * kh_value * kw_value * 8 +
+                                                 ic_idx * kh_value * kw_value * 8 +
+                                                 kh * kw_value * 8 + kw * 8 + g;
+
+                                *(output_ptr + output_idx) = *(input_ptr + input_idx);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        ABORT_S() << "error: not supported reorder!";
+    }
+}
+
+// reorder bias layout from NCHW to 1C11
+static void bias_reorder_nchw(Tensor<X86>& input,
+                              Tensor<X86>& output,
+                              const std::vector<float>& scale) {
+    Shape shape = input.shape();
+    int n = shape[0], c = shape[1], h = shape[2], w = shape[3];
+
+    if (input.get_dtype() == AK_FLOAT && output.get_dtype() == AK_INT32) {
+        int* output_ptr = static_cast<int*>(output.mutable_data());
+        const float* input_ptr = static_cast<const float*>(input.data());
+
+        #pragma omp parallel for collapse(4) schedule(static)
+
+        for (int n_idx = 0; n_idx < n; ++n_idx) {
+            for (int c_idx = 0; c_idx < c; ++c_idx) {
+                for (int h_idx = 0; h_idx < h; ++h_idx) {
+                    for (int w_idx = 0; w_idx < w; ++w_idx) {
+                        int input_idx = n_idx * c * h * w +
+                                        c_idx * h * w +
+                                        h_idx * w + w_idx;
+                        int output_idx = n_idx * c * h * w +
+                                         c_idx * h * w +
+                                         h_idx * w + w_idx;
+
+                        float scale_v = scale[c_idx];
+                        *(output_ptr + output_idx) = (*(input_ptr + input_idx)) * scale_v;
+                    }
+                }
+            }
+        }
+    } else if (input.get_dtype() == AK_INT32 && output.get_dtype() == AK_INT32) {
+        int* output_ptr = static_cast<int*>(output.mutable_data());
+        const int* input_ptr = static_cast<const int*>(input.data());
+
+        #pragma omp parallel for collapse(4) schedule(static)
+
+        for (int n_idx = 0; n_idx < n; ++n_idx) {
+            for (int c_idx = 0; c_idx < c; ++c_idx) {
+                for (int h_idx = 0; h_idx < h; ++h_idx) {
+                    for (int w_idx = 0; w_idx < w; ++w_idx) {
+                        int input_idx = n_idx * c * h * w +
+                                        c_idx * h * w +
+                                        h_idx * w + w_idx;
+                        int output_idx = n_idx * c * h * w +
+                                         c_idx * h * w +
+                                         h_idx * w + w_idx;
+
+                        *(output_ptr + output_idx) = *(input_ptr + input_idx);
+                    }
+                }
+            }
+        }
+    } else {
+        ABORT_S() << "error: not supported convert!";
+    }
+
+}
+
+// reorder input layout from NCHW(oc, ic, kh, kw) to nChwc8
+inline void input_reorder_nChwc8(Tensor<X86>& input,
+                                 Tensor<X86>& output) {
+    CHECK_EQ(input.get_dtype(), AK_FLOAT) << "only support float type";
+    CHECK_EQ(output.get_dtype(), AK_FLOAT) << "only support float type";
+    Shape shape = input.valid_shape();
+    int n_value = shape[0], c_value = shape[1], h_value = shape[2], w_value = shape[3];
+
+    Shape new_shape({n_value, utils::round_up(c_value, 8) / 8, h_value, w_value, 8}, Layout_NCHW_C8);
+
+    float* output_ptr = static_cast<float*>(output.mutable_data());
+    const float* input_ptr = static_cast<const float*>(input.data());
+    #pragma omp parallel for collapse(5) schedule(static)
+
+    for (int n = 0; n < n_value; ++n) {
+        for (int c_idx = 0; c_idx < new_shape[1]; ++c_idx) {
+            for (int h = 0; h < h_value; ++h) {
+                for (int w = 0; w < w_value; ++w) {
+                    for (int c = 0; c < 8; ++c) {
+                        int input_idx = n * c_value * h_value * w_value + (c_idx * 8 + c) * h_value * w_value +
+                                        h * w_value + w;
+                        int output_idx = n * new_shape[1] * h_value * w_value * 8 + c_idx * h_value * w_value * 8 +
+                                         h * w_value * 8 + w * 8 + c;
+
+                        *(output_ptr + output_idx) = ((c_idx * 8 + c) < c_value) ? *(input_ptr + input_idx) : 0;
                     }
                 }
             }
         }
     }
 }
+
+// reorder input layout from nchw_c8 to NCHW
+inline void reorder_nchwc8_nchw(Tensor<X86>& input,
+                             Tensor<X86>& output) {
+
+    CHECK_EQ(input.get_dtype(), AK_FLOAT) << "only support float type";
+    CHECK_EQ(output.get_dtype(), AK_FLOAT) << "only support float type";
+    Shape shape = output.valid_shape();
+    int n_value = shape[0];
+    int c_value = shape[1];
+    int h_value = shape[2];
+    int w_value = shape[3];
+    Shape shape_input = input.valid_shape();
+    int c_round_div8=shape_input[1];
+    if(input.get_layout()==Layout_NCHW_C8R) {
+        c_round_div8 = (shape_input.channel() + 7) / 8;
+    }
+
+    float* output_ptr = static_cast<float*>(output.mutable_data());
+    const float* input_ptr = static_cast<const float*>(input.data());
+#pragma omp parallel for collapse(4) schedule(static)
+    for (int n = 0; n < n_value; ++n) {
+        for (int c = 0; c < c_value; ++c) {
+            for (int h = 0; h < h_value; ++h) {
+                for (int w = 0; w < w_value; ++w) {
+                    int round_c=c/8;
+                    int remainder_c=c%8;
+                    int input_idx = n * c_round_div8 * h_value * w_value*8 + round_c * h_value * w_value*8 +
+                                    h * w_value*8 + w*8+remainder_c;
+                    int output_idx = n * c_value * h_value * w_value + c * h_value * w_value  +
+                                     h * w_value  + w ;
+
+                    *(output_ptr + output_idx) = input_ptr[input_idx];
+                }
+            }
+        }
+    }
+
+}
+
+// reorder output layout from NCHW(oc, ic, kh, kw) to nChwc8
+inline void output_reorder_nChwc8(Tensor<X86>& input,
+                                  Tensor<X86>& output) {
+
+    input_reorder_nChwc8(input, output);
+}
+
+inline void weight_padding_nhwc(Tensor<X86>* input, Tensor<X86>* output) {
+    Shape shape = input->shape();
+    Shape shape_padding = output->shape();
+    int oc_value = shape[0], ic_value = shape[1], kh_value = shape[2], kw_value = shape[3];
+    int oc_padding = shape_padding[0], ic_padding = shape_padding[1];;
+
+    char* output_ptr = static_cast<char*>(output->mutable_data());
+    const char* input_ptr = static_cast<const char*>(input->data());
+
+    #pragma omp parallel for collapse(4) schedule(static)
+    for (int oc = 0; oc < oc_padding; ++oc) {
+        for (int ic = 0; ic < ic_padding; ++ic) {
+            for (int kh = 0; kh < kh_value; ++kh) {
+                for (int kw = 0; kw < kw_value; ++kw) {
+                    int input_idx = oc * ic_value * kh_value * kw_value +
+                                    ic * kh_value * kw_value +
+                                    kh * kw_value + kw;
+                    int output_idx = oc * ic_padding * kh_value * kw_value +
+                                    ic * kh_value * kw_value +
+                                    kh * kw_value + kw;
+                    if (oc < oc_value && ic < ic_value) {
+                        *(output_ptr + output_idx) = (*(input_ptr + input_idx));
+                    } else {
+                        *(output_ptr + output_idx) = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+
+template<typename T> struct is_integral
+{ static constexpr bool value = false; };
+
+template<> struct is_integral<int32_t> { static constexpr bool value = true; };
+template<> struct is_integral<int16_t> { static constexpr bool value = true; };
+template<> struct is_integral<int8_t> { static constexpr bool value = true; };
+template<> struct is_integral<uint8_t> { static constexpr bool value = true; };
+
+template <typename data_t, typename acc_t>
+inline typename std::enable_if<!is_integral<data_t>::value,
+       typename std::remove_reference<data_t>::type>::type
+saturate(const acc_t &x) { return x; }
+
+template <typename data_t, typename acc_t>
+inline typename std::enable_if<is_integral<data_t>::value,
+       typename std::remove_reference<data_t>::type>::type
+saturate(const acc_t &x) {
+    acc_t v = x;
+    if (v < (acc_t)std::numeric_limits<data_t>::lowest())
+        v = (acc_t)std::numeric_limits<data_t>::lowest();
+    if (v > (acc_t)std::numeric_limits<data_t>::max())
+        v = (acc_t)std::numeric_limits<data_t>::max();
+    return (typename std::remove_reference<data_t>::type)v;
+}
+
+template <typename out_t>
+inline out_t round_and_saturate(float f, round_mode rmode) {
+    switch (rmode) {
+    case round_mode::nearest: f = nearbyintf(f); break;
+    case round_mode::down: f = floorf(f); break;
+    }
+    return saturate<out_t>(f);
+}
+
+/* Quantization with beta == 0 */
+template <typename in_t, typename out_t> struct qz_b0 {
+    out_t operator()(in_t in, float alpha, round_mode rmode)
+    { return round_and_saturate<out_t>(alpha * in, rmode); }
+};
 
 inline size_t datatype_size(DataType data_type) {
     switch (data_type) {
@@ -733,7 +1145,7 @@ inline size_t datatype_size(DataType data_type) {
     case AK_INT32:
         return sizeof(int32_t);
 
-    case AK_INT16:
+    case AK_HALF:
         return sizeof(int16_t);
 
     case AK_INT8:
@@ -750,222 +1162,27 @@ inline size_t datatype_size(DataType data_type) {
     return 0;
 }
 
+/** returns floor(log2(v)), aka the position of the leftmost non-0 bit */
+inline int ilog2q(size_t v) {
+    if (v == 0)
+        return -1;
 
-template<typename DataTensor_in, typename DataTensor_out>
-inline void  conv_basic_x86(DataTensor_in& tensor_out, DataTensor_out& tensor_in,
-                            const float* weights, const float* bias, int group,
-                            int kernel_w, int kernel_h, int stride_w, int stride_h, int dila_w, int dila_h,
-                            int pad_w, int pad_h, bool flag_bias, bool flag_relu) {
-
-    auto src_data = reinterpret_cast<const float*>(tensor_in.data());
-    auto dst_data_ref = reinterpret_cast<float*>(tensor_out.mutable_data());
-    auto weights_data = weights;
-    bool with_bias = flag_bias;
-    auto bias_data = bias;
-
-    int in_num = tensor_out.num();
-    int out_channels = tensor_out.channel();
-    int out_h = tensor_out.height();
-    int out_w = tensor_out.width();
-
-    int in_channel = tensor_in.channel();
-    int in_h = tensor_in.height();
-    int in_w = tensor_in.width();
-    int out_c_group = out_channels / group;
-    int in_c_group = in_channel / group;
-
-    for (int n = 0; n < in_num; ++n) {
-        for (int g = 0; g < group; ++g) {
-            for (int oc = 0; oc < out_c_group; ++oc) {
-                for (int oh = 0; oh < out_h; ++oh) {
-                    for (int ow = 0; ow < out_w; ++ow) {
-                        int out_idx = n * group * out_c_group * out_h * out_w + g * out_c_group * out_h * out_w
-                                      + oc * out_h * out_w + oh * out_w + ow;
-                        dst_data_ref[out_idx] = with_bias ? (float)(bias_data[g * out_c_group + oc]) : 0.f;
-
-                        for (int ic = 0; ic < in_c_group; ++ic) {
-                            for (int kh = 0; kh < kernel_h; ++kh) {
-                                for (int kw = 0; kw < kernel_w; ++kw) {
-                                    int iw = ow * stride_w - pad_w + kw * (dila_w);
-                                    int ih = oh * stride_h - pad_h + kh * (dila_h);
-
-                                    if (iw < 0 || iw >= in_w) {
-                                        continue;
-                                    }
-
-                                    if (ih < 0 || ih >= in_h) {
-                                        continue;
-                                    }
-
-                                    int iidx = n * in_channel * in_h * in_w
-                                               + g * in_c_group * in_h * in_w
-                                               + ic * in_h * in_w
-                                               + ih * in_w
-                                               + iw;
-                                    int widx = g * out_c_group * in_c_group * kernel_h * kernel_w
-                                               + oc * in_c_group * kernel_h * kernel_w
-                                               + ic * kernel_h * kernel_w
-                                               + kh * kernel_w
-                                               + kw;
-
-                                    dst_data_ref[out_idx]
-                                    += src_data[iidx]
-                                       * weights_data[widx];
-                                }
-                            }
-                        }
-
-                        if (flag_relu) {
-                            dst_data_ref[out_idx] = dst_data_ref[out_idx] > 0.f ? dst_data_ref[out_idx] : 0.f;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    int p = 0;
+#   define CP(pw) do { if (v >= (1ull << pw)) { v >>= pw; p += pw; } } while(0)
+    CP(32); CP(16); CP(8); CP(4); CP(2); CP(1);
+#   undef CP
+    return p;
 }
 
-static inline bool is_a_ge_zero_and_a_lt_b(int a, int b) {
-    return static_cast<unsigned>(a) < static_cast<unsigned>(b);
-}
-
-template <typename Dtype>
-static void im2col_cpu(const Dtype* data_im, const int channels,
-                       const int height, const int width, const int kernel_h, const int kernel_w,
-                       const int pad_h, const int pad_w,
-                       const int stride_h, const int stride_w,
-                       const int dilation_h, const int dilation_w,
-                       Dtype* data_col) {
-    const int output_h = (height + 2 * pad_h -
-                          (dilation_h * (kernel_h - 1) + 1)) / stride_h + 1;
-    const int output_w = (width + 2 * pad_w -
-                          (dilation_w * (kernel_w - 1) + 1)) / stride_w + 1;
-    const int channel_size = height * width;
-
-    for (int channel = channels; channel--; data_im += channel_size) {
-        for (int kernel_row = 0; kernel_row < kernel_h; kernel_row++) {
-            for (int kernel_col = 0; kernel_col < kernel_w; kernel_col++) {
-                int input_row = -pad_h + kernel_row * dilation_h;
-
-                for (int output_rows = output_h; output_rows; output_rows--) {
-                    if (!is_a_ge_zero_and_a_lt_b(input_row, height)) {
-                        for (int output_cols = output_w; output_cols; output_cols--) {
-                            *(data_col++) = 0;
-                        }
-                    } else {
-                        int input_col = -pad_w + kernel_col * dilation_w;
-
-                        for (int output_col = output_w; output_col; output_col--) {
-                            if (is_a_ge_zero_and_a_lt_b(input_col, width)) {
-                                *(data_col++) = data_im[input_row * width + input_col];
-                            } else {
-                                *(data_col++) = 0;
-                            }
-
-                            input_col += stride_w;
-                        }
-                    }
-
-                    input_row += stride_h;
-                }
-            }
-        }
-    }
-}
-
-inline void mkl_gemm(const bool TransA, const bool TransB, int m, int n, int k, const float alpha,
-                 const float* a, const float* b, const float beta, float* c) {
-    //    cout << "(" << m << "," << n << "," << k << ")" << endl;
-    int lda = (!TransA/* == CblasNoTrans*/) ? k : m;
-    int ldb = (!TransB/* == CblasNoTrans*/) ? n : k;
-    CBLAS_TRANSPOSE cuTransA =
-            (!TransA/* == CblasNoTrans*/) ? CblasNoTrans : CblasTrans;
-    CBLAS_TRANSPOSE cuTransB =
-            (!TransB/* == CblasNoTrans*/) ? CblasNoTrans : CblasTrans;
-    cblas_sgemm(CblasRowMajor, cuTransA, cuTransB, m, n, k, alpha, a, k, b, n, beta, c, n);
+struct scratchpad_t {
+    virtual ~scratchpad_t() {}
+    virtual char *get() const = 0;
 };
 
-template<typename DataTensor_in, typename DataTensor_out,typename DataTensor_op>
-inline void im2col_conv_cpu(DataTensor_in& tensor_out, DataTensor_out& tensor_in,DataTensor_op& tensor_temp,
-                        const float* weights, const float* bias, int group,
-                        int kernel_w, int kernel_h, int stride_w, int stride_h, int dila_w, int dila_h,
-                        int pad_w, int pad_h, bool flag_bias, bool flag_relu ) {
-    int in_c = tensor_in.channel();
-    int in_h = tensor_in.height();
-    int in_w = tensor_in.width();
-    int out_c = tensor_out.channel();
-    int out_h = tensor_out.height();
-    int out_w = tensor_out.width();
-    CHECK_EQ(group,1)<<"only support group == 1";
-    int slice_size=in_c*kernel_h*kernel_w * out_h*out_w;
-    int batch_size=tensor_in.num();
-    tensor_temp.try_expand_size(slice_size);
-
-    for(int i=0;i<batch_size;i++){
-        im2col_cpu(tensor_in.data()+i*(in_c*in_h*in_w),in_c,in_h,in_w,kernel_h,kernel_w,pad_h,pad_w,stride_h,stride_w,dila_h,dila_w,tensor_temp.mutable_data());
-        mkl_gemm(false,false,out_c,out_h*out_w,in_c*kernel_h*kernel_w,1.f,weights,tensor_temp.data(),0,tensor_out.mutable_data()+i*out_c*out_h*out_w);
-    }
-
-    if(flag_bias&& !flag_relu){
-        float *output=tensor_out.mutable_data();
-        int id=0;
-        for(int i=0;i<batch_size;i++){
-            for(int oc=0;oc<out_c;++oc) {
-                for (int inner_id = 0; inner_id < out_h*out_w; ++inner_id,++id) {
-                    output[id]+=bias[oc];
-                }
-            }
-        }
-    }else if(!flag_bias&&flag_relu){
-        float *output=tensor_out.mutable_data();
-        int id=0;
-        for(int i=0;i<batch_size;i++){
-            for(int oc=0;oc<out_c;++oc) {
-                for (int inner_id = 0; inner_id < out_h*out_w; ++inner_id,++id) {
-                    if(output[id]<0){
-                        output[id]=0;
-                    }
-                }
-            }
-        }
-    }else if(flag_bias&&flag_relu){
-        float *output=tensor_out.mutable_data();
-        int id=0;
-        for(int i=0;i<batch_size;i++){
-            for(int oc=0;oc<out_c;++oc) {
-                for (int inner_id = 0; inner_id < out_h*out_w; ++inner_id,++id) {
-                    float temp=output[id];
-                    temp+=bias[oc];
-                    if(temp<0){
-                        temp=0;
-                    }
-                    output[id]=temp;
-                }
-            }
-        }
-    }
-}
 
 } // namespace saber
 } // namespace anakin
 
-#ifdef USE_OPENMP
-#include <omp.h>
-#else
-inline int omp_get_max_threads() {
-    return 1;
-}
-inline int omp_get_num_threads() {
-    return 1;
-}
-inline int omp_get_thread_num() {
-    return 0;
-}
-inline int omp_in_parallel() {
-    return 0;
-}
-#endif
+
 
 #endif // X86_UTILS_H
-
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

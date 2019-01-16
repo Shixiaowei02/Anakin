@@ -16,7 +16,7 @@
 #ifndef ANAKIN_SABER_CORE_ENV_H
 #define ANAKIN_SABER_CORE_ENV_H
 
-#include "saber/core/device.h"
+#include "core/device.h"
 
 namespace anakin{
 
@@ -31,7 +31,7 @@ public:
         static Devs* _g_env = new Devs();
         return *_g_env;
     }
-    static void env_init(int max_stream = 1){
+    static void env_init(int max_stream = 4){
         Devs& devs = cur_env();
         if (devs.size() > 0){
             return;
@@ -39,7 +39,7 @@ public:
         int count = 0;
         API::get_device_count(count);
         if (count == 0) {
-            LOG(WARNING) << "no device found!";
+            CHECK(false) << "no device found!";
         } else {
             LOG(INFO) << "found " << count << " device(s)";
         }
@@ -49,11 +49,12 @@ public:
             devs.push_back(Device<TargetType>(max_stream));
         }
         API::set_device(cur_id);
+        devs[cur_id].create_stream();
+        LOG(INFO) << "dev size = " << devs.size() << ", current device id: " << cur_id;
     }
 private:
     Env(){}
 };
-
 
 } //namespace saber
 

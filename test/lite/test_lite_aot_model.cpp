@@ -5,7 +5,7 @@
 
 using namespace anakin::saber;
 using namespace anakin::saber::lite;
-typedef Tensor<CPU, AK_FLOAT> TensorHf;
+typedef Tensor<CPU> TensorHf;
 
 std::string model_file_name;
 int FLAGS_num = 1;
@@ -151,24 +151,24 @@ int main(int argc, const char** argv){
     LOG(INFO)<< "   epoch:          time statistic epoch default to 10";
     LOG(INFO)<< "   cluster:        choose which cluster to run, 0: big cores, 1: small cores";
     LOG(INFO)<< "   threads:        set openmp threads";
-    if(argc < 2) {
+    if (argc < 2) {
         LOG(ERROR) << "You should fill in the variable model_dir and model_file at least.";
         return 0;
     }
-    if(argc > 1) {
+    if (argc > 1) {
         model_file_name = argv[1];
     }
 
-    if(argc > 2) {
+    if (argc > 2) {
         FLAGS_num = atoi(argv[2]);
     }
-    if(argc > 3) {
+    if (argc > 3) {
         FLAGS_warmup_iter = atoi(argv[3]);
     }
-    if(argc > 4) {
+    if (argc > 4) {
         FLAGS_epoch = atoi(argv[4]);
     }
-    if(argc > 5) {
+    if (argc > 5) {
         FLAGS_cluster = atoi(argv[5]);
         if (FLAGS_cluster < 0) {
             FLAGS_cluster = 0;
@@ -177,7 +177,7 @@ int main(int argc, const char** argv){
             FLAGS_cluster = 1;
         }
     }
-    if(argc > 6) {
+    if (argc > 6) {
         FLAGS_threads = atoi(argv[6]);
     }
     InitTest();

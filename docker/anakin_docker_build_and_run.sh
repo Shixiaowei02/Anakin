@@ -55,13 +55,13 @@ building_and_run_nvidia_gpu_docker() {
 	tag="$(echo $DockerfilePath | awk -F/ '{print tolower($(NF-3) "_" $(NF-1))}')"
 	if [ ! $MODE = "Run" ]; then
 		echo "Building nvidia docker ... [ docker_image_name: anakin image_tag: $tag ]"	
-		docker build --network=host -t anakin:$tag"-base" . -f $DockerfilePath
-        docker run --network=host -it anakin:$tag"-base"  Anakin/tools/gpu_build.sh
-        container_id=$(docker ps -l | sed -n 2p | awk '{print $1}')
-        docker commit $container_id anakin:$tag
+		sudo docker build --network=host -t anakin:$tag"-base" . -f $DockerfilePath
+        sudo docker run --network=host -it anakin:$tag"-base"  Anakin/tools/nv_gpu_build.sh
+        container_id=$(sudo docker ps -l | sed -n 2p | awk '{print $1}')
+        sudo docker commit $container_id anakin:$tag
 	else
 		echo "Running nvidia docker ... [ docker_image_name: anakin image_tag: $tag ]" 
-		docker run --network=host --runtime=nvidia --rm -it anakin:$tag  /bin/bash
+		sudo docker run --network=host --runtime=nvidia --rm -it anakin:$tag  /bin/bash
 	fi
 }
 
@@ -75,45 +75,25 @@ building_and_run_amd_gpu_docker() {
 	tag="$(echo $DockerfilePath | awk -F/ '{print tolower($(NF-3) "_" $(NF-1))}')"
 	if [ ! $MODE = "Run" ]; then
 		echo "Building amd docker ... [ docker_image_name: anakin image_tag: $tag ]"	
-		docker build --network=host -t anakin:$tag . -f $DockerfilePath
+		sudo docker build --network=host -t anakin:$tag . -f $DockerfilePath
 	else
 		echo "Running amd docker ... [ docker_image_name: anakin image_tag: $tag ]" 
-		docker run -it --device=/dev/kfd --device=/dev/dri --group-add video anakin:$tag /bin/bash
+		sudo docker run -it --device=/dev/kfd --device=/dev/dri --group-add video anakin:$tag /bin/bash
 	fi
 }
 
 # building and running docker for x86
 building_and_run_x86_docker() { 
-	if [ ! $# -eq 2 ]; then
-		exit 1
-	fi
-	DockerfilePath=$1
-	MODE=$2
-	tag="$(echo $DockerfilePath | awk -F/ '{print tolower($(NF-3) "_" $(NF-1))}')"
-	if [ ! $MODE = "Run" ]; then
-		echo "Building X86 docker ... [ docker_image_name: anakin image_tag: $tag ]"	
-		docker build --network=host -t anakin:$tag . -f $DockerfilePath
-	else
-		echo "Running X86 docker ... [ docker_image_name: anakin image_tag: $tag ]" 
-		docker run -it anakin:$tag /bin/bash
-	fi
+	echo "not support yet"
+	read
+	exit 1
 }
 
 # building docker for arm
 building_and_arm_docker() { 
-	if [ ! $# -eq 2 ]; then
-		exit 1
-	fi
-	DockerfilePath=$1
-	MODE=$2
-	tag="$(echo $DockerfilePath | awk -F/ '{print tolower($(NF-3) "_" $(NF-1))}')"
-	if [ ! $MODE = "Run" ]; then
-		echo "Building ARM docker ... [ docker_image_name: anakin image_tag: $tag ]"	
-		docker build --network=host -t anakin:$tag . -f $DockerfilePath
-	else
-		echo "Running ARM docker ... [ docker_image_name: anakin image_tag: $tag ]" 
-		docker run -it anakin:$tag /bin/bash
-	fi
+	echo "not support yet, Press any key to continue ..."
+	read
+	exit 1
 }
 
 # dispatch user args to target docker path

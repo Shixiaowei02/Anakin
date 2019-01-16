@@ -4,35 +4,25 @@ namespace anakin {
 
 namespace ops {
 
-#ifdef USE_CUDA
-template<>
-void Lstm<NV, AK_FLOAT, Precision::FP32>::operator() (OpContext<NV> &ctx,
-                          const std::vector<Tensor4dPtr<NV, AK_FLOAT> >& ins, 
-                          std::vector<Tensor4dPtr<NV, AK_FLOAT> >& outs) {
-    auto* impl = static_cast<LstmHelper<NV, AK_FLOAT, Precision::FP32>*>(this->_helper);
-    auto& param = static_cast<LstmHelper<NV, AK_FLOAT, Precision::FP32>*>(this->_helper)->_param_lstm;
-    impl->_funcs_lstm(ins, outs, param, ctx);
+#define INSTANCE_LSTM(Ttype, Ptype) \
+template<> \
+void Lstm<Ttype, Ptype>::operator()(OpContext<Ttype>& ctx, \
+    const std::vector<Tensor4dPtr<Ttype> >& ins, \
+    std::vector<Tensor4dPtr<Ttype> >& outs) { \
+    auto* impl = static_cast<LstmHelper<Ttype, Ptype>*>(this->_helper); \
+    auto& param = static_cast<LstmHelper<Ttype, Ptype>*> \
+                  (this->_helper)->_param_lstm; \
+    impl->_funcs_lstm(ins, outs, param, ctx); \
 }
-#endif
-#ifdef USE_X86_PLACE
-template<>
-void Lstm<X86, AK_FLOAT, Precision::FP32>::operator() (OpContext<X86> &ctx,
-                                                     const std::vector<Tensor4dPtr<X86, AK_FLOAT> >& ins,
-                                                     std::vector<Tensor4dPtr<X86, AK_FLOAT> >& outs) {
-    auto* impl = static_cast<LstmHelper<X86, AK_FLOAT, Precision::FP32>*>(this->_helper);
-    auto& param = static_cast<LstmHelper<X86, AK_FLOAT, Precision::FP32>*>(this->_helper)->_param_lstm;
-    impl->_funcs_lstm(ins, outs, param, ctx);
-}
-#endif
 
 /// TODO ... specialization other type of operator
 /// set helper
-template<typename Ttype, DataType Dtype, Precision Ptype>
-LstmHelper<Ttype, Dtype, Ptype>::~LstmHelper() {
+template<typename Ttype, Precision Ptype>
+LstmHelper<Ttype, Ptype>::~LstmHelper() {
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-Status LstmHelper<Ttype, Dtype, Ptype>::InitParam() {
+template<typename Ttype, Precision Ptype>
+Status LstmHelper<Ttype, Ptype>::InitParam() {
     DLOG(WARNING) << "Parsing Lstm op parameter.";
 
     auto num_direction = GET_PARAMETER(int, num_direction);
@@ -45,16 +35,15 @@ Status LstmHelper<Ttype, Dtype, Ptype>::InitParam() {
     auto is_reverse = GET_PARAMETER(bool, is_reverse);
     auto use_peepholes = GET_PARAMETER(bool, use_peepholes);
 
-    //auto weight_wu = GET_PARAMETER(PBlock<typename DataTypeWarpper<Dtype>::type>, weight_1);
+    //auto weight_wu = GET_PARAMETER(PBlock<typename DataTypeWarpper<pe>::type>, weight_1);
     //auto bias = GET_PARAMETER(PBlock<typename DataTypeWarpper<Dtype>::type>, weight_2);
-    using pblock_type = PBlock<typename DataTypeWarpper<Dtype>::type, Ttype>;
+    using pblock_type = PBlock<Ttype>;
     auto weight_wu = GET_PARAMETER(pblock_type, weight_1);
     auto bias = GET_PARAMETER(pblock_type, weight_2);
 
 
     LOG(INFO)<<"lstm act = ["<<input_activation<<","<<gate_activation<<","<<cell_activation<<","<<candidate_activation<<"]";
     LOG(INFO)<<"lstm other param = ["<<use_peepholes<<","<<is_reverse<<","<<dropout_param<<","<<num_direction<<","<<num_layers<<"]";
-//    exit(0);
 
     std::unordered_map<std::string, ActiveType> enum_map = {
             {"null",Active_unknow},
@@ -65,7 +54,7 @@ Status LstmHelper<Ttype, Dtype, Ptype>::InitParam() {
             {"sigmoid", Active_sigmoid},
             {"tanh", Active_tanh},
     };
-    LstmParam<Tensor4d<Ttype, Dtype>> lstm_param(&(weight_wu.d_tensor()), &(bias.d_tensor()), nullptr,
+    LstmParam<Ttype> lstm_param(&(weight_wu.d_tensor()), &(bias.d_tensor()), nullptr,
             enum_map[input_activation], enum_map[gate_activation],
             enum_map[cell_activation], enum_map[candidate_activation],
             use_peepholes, false, is_reverse, dropout_param,
@@ -75,67 +64,69 @@ Status LstmHelper<Ttype, Dtype, Ptype>::InitParam() {
     return Status::OK();
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-Status LstmHelper<Ttype, Dtype, Ptype>::Init(OpContext<Ttype> &ctx,
-                                                const std::vector<Tensor4dPtr<Ttype, Dtype> >& ins, 
-                                                std::vector<Tensor4dPtr<Ttype, Dtype> >& outs) {
+template<typename Ttype, Precision Ptype>
+Status LstmHelper<Ttype, Ptype>::Init(OpContext<Ttype> &ctx,
+                                                const std::vector<Tensor4dPtr<Ttype> >& ins,
+                                                std::vector<Tensor4dPtr<Ttype> >& outs) {
     DLOG(INFO)<<"inti lstm in op.cpp";
-    #ifdef USE_CUDA
     SABER_CHECK(_funcs_lstm.init(ins, outs, _param_lstm, SPECIFY, SABER_IMPL, ctx));
-    #else
-    SABER_CHECK(_funcs_lstm.init(ins, outs, _param_lstm, SPECIFY, SABER_IMPL, ctx));
-    #endif
     return Status::OK();
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-Status LstmHelper<Ttype, Dtype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Ttype, Dtype> >& ins,
-                                                      std::vector<Tensor4dPtr<Ttype, Dtype> >& outs) {
+template<typename Ttype, Precision Ptype>
+Status LstmHelper<Ttype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Ttype> >& ins,
+                                                      std::vector<Tensor4dPtr<Ttype> >& outs) {
     SABER_CHECK(_funcs_lstm.compute_output_shape(ins, outs, _param_lstm));
     return Status::OK();
 }
 
-#ifdef USE_CUDA
-template class LstmHelper<NV, AK_FLOAT, Precision::FP32>;
-template class LstmHelper<NV, AK_FLOAT, Precision::FP16>;
-template class LstmHelper<NV, AK_FLOAT, Precision::INT8>;
-#endif
-
-#ifdef USE_ARM_PLACE
-template class LstmHelper<ARM, AK_FLOAT, Precision::FP32>;
-template class LstmHelper<ARM, AK_FLOAT, Precision::FP16>;
-template class LstmHelper<ARM, AK_FLOAT, Precision::INT8>;
-#endif
-
-#ifdef USE_X86_PLACE
-template class LstmHelper<X86, AK_FLOAT, Precision::FP32>;
-template class LstmHelper<X86, AK_FLOAT, Precision::FP16>;
-template class LstmHelper<X86, AK_FLOAT, Precision::INT8>;
+#ifdef AMD_GPU
+INSTANCE_LSTM(AMD, Precision::FP32);
+template class LstmHelper<AMD, Precision::FP32>;
+ANAKIN_REGISTER_OP_HELPER(Lstm, LstmHelper, AMD, Precision::FP32);
 #endif
 
 #ifdef USE_CUDA
-ANAKIN_REGISTER_OP_HELPER(Lstm, LstmHelper, NV, AK_FLOAT, Precision::FP32);
+INSTANCE_LSTM(NV, Precision::FP32);
+template class LstmHelper<NV, Precision::FP32>;
+template class LstmHelper<NV, Precision::FP16>;
+template class LstmHelper<NV, Precision::INT8>;
+ANAKIN_REGISTER_OP_HELPER(Lstm, LstmHelper, NV, Precision::FP32);
 #endif
+
 #ifdef USE_ARM_PLACE
-ANAKIN_REGISTER_OP_HELPER(Lstm, LstmHelper, ARM, AK_FLOAT, Precision::FP32);
+INSTANCE_LSTM(ARM, Precision::FP32);
+template class LstmHelper<ARM, Precision::FP32>;
+template class LstmHelper<ARM, Precision::FP16>;
+template class LstmHelper<ARM, Precision::INT8>;
+ANAKIN_REGISTER_OP_HELPER(Lstm, LstmHelper, ARM, Precision::FP32);
 #endif
+
 #ifdef USE_X86_PLACE
-ANAKIN_REGISTER_OP_HELPER(Lstm, LstmHelper, X86, AK_FLOAT, Precision::FP32);
+INSTANCE_LSTM(X86, Precision::FP32);
+template class LstmHelper<X86, Precision::FP32>;
+template class LstmHelper<X86, Precision::FP16>;
+template class LstmHelper<X86, Precision::INT8>;
+ANAKIN_REGISTER_OP_HELPER(Lstm, LstmHelper, X86, Precision::FP32);
 #endif
+
 //! register op
 ANAKIN_REGISTER_OP(Lstm)
     .Doc("Lstm operator")
 #ifdef USE_CUDA
-    .__alias__<NV, AK_FLOAT, Precision::FP32>("LSTM")
-    .__alias__<NV, AK_FLOAT, Precision::FP32>("Lstm")
+    .__alias__<NV, Precision::FP32>("Lstm")
+    .__alias__<NV, Precision::FP32>("LSTM")
 #endif
 #ifdef USE_ARM_PLACE
-    .__alias__<ARM, AK_FLOAT, Precision::FP32>("LSTM")
-    .__alias__<ARM, AK_FLOAT, Precision::FP32>("Lstm")
+    .__alias__<ARM, Precision::FP32>("Lstm")
 #endif
 #ifdef USE_X86_PLACE
-    .__alias__<X86, AK_FLOAT, Precision::FP32>("LSTM")
-    .__alias__<X86, AK_FLOAT, Precision::FP32>("Lstm")
+    .__alias__<X86, Precision::FP32>("Lstm")
+    .__alias__<X86, Precision::FP32>("LSTM")
+#endif
+#ifdef AMD_GPU
+    .__alias__<AMD, Precision::FP32>("Lstm")
+    .__alias__<AMD, Precision::FP32>("LSTM")
 #endif
     .num_in(1)
     .num_out(1)

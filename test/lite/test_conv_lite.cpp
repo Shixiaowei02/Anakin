@@ -1,58 +1,46 @@
 #include "test_lite.h"
-#include "saber/lite/funcs/saber_conv_act.h"
+#include "saber/lite/funcs/saber_conv.h"
 #include "saber/lite/funcs/neon/impl/conv_arm_impl.h"
 
 using namespace anakin::saber;
 using namespace anakin::saber::lite;
 
-int cluster = 0;
-int threads = 1;
-int test_iter = 10;
+int g_cluster = 0;
+int g_threads = 1;
+int g_test_iter = 1;
+bool g_basic_test = false;
+bool g_compare_result = true;
+bool g_flag_relu = true;
+bool g_flag_bias = true;
 
-bool compare_result = false;
-bool flag_relu = false;
-bool flag_bias = true;
+int g_num = 1;
+int g_ch_in = 32;
+int g_h_in = 112;
+int g_w_in = 112;
 
-int num = 1;
-int ch_in = 32;
-int h_in = 112;
-int w_in = 112;
+int g_ch_out = 32;
+int g_group = 32;
+int g_kw = 3;
+int g_pad_w = 1;
+int g_stride_w = 1;
+int g_dila_w = 1;
+int g_kh = 3;
+int g_pad_h = 1;
+int g_stride_h = 1;
+int g_dila_h = 1;
 
-int ch_out = 64;
-int group = 1;
-int kernel = 3;
-int pad = 1;
-int stride = 1;
-int dila = 1;
+typedef Tensor<CPU> TensorHf4;
 
-typedef Tensor<CPU, AK_FLOAT> TensorHf4;
-template <typename Tensor_t>
-void tensor_diff(Tensor_t& t1, Tensor_t& t2, Tensor_t& tdiff) {
-
-    typedef typename Tensor_t::Dtype dtype;
-    int size1 = t1.valid_size();
-    int size2 = t2.valid_size();
-    int size_out = tdiff.valid_size();
-    CHECK_EQ(size1, size2) << "wrong shape";
-    CHECK_EQ(size1, size_out) << "wrong shape";
-    const dtype* ptr1 = t1.data();
-    const dtype* ptr2 = t2.data();
-    dtype* ptr_out = tdiff.mutable_data();
-    for (int i = 0; i < size1; ++i) {
-        ptr_out[i] = ptr1[i] - ptr2[i];
-    }
-}
-
-void test_arm_conv(std::vector<TensorHf4*>& tin, \
-    int ch_out, int kernel, int stride, int pad, \
-    int dila, int group, bool bias_flag, int thread_num, int cluster_id) {
+SaberStatus test_arm_conv(int n, int c, int h, int w, \
+    int ch_out, int kernel_w, int kernel_h, int stride_w, int stride_h, int pad_w, int pad_h, \
+    int dila_w, int dila_h, int group, bool is_bias, bool is_relu, int thread_num, int cluster_id) {
 
     double to = 0;
     double min_time = 1000000;
     SaberTimer t1;
 
     Context ctx1;
-    PowerMode mode = cluster_id == 0? SABER_POWER_HIGH : SABER_POWER_LOW;
+    PowerMode mode = (PowerMode)cluster_id;
     ctx1.set_run_mode(mode, thread_num);
     LOG(INFO) << "test threads activated";
 #pragma omp parallel
@@ -66,85 +54,84 @@ void test_arm_conv(std::vector<TensorHf4*>& tin, \
     TensorHf4 tout_basic;
     TensorHf4 tout_saber;
 
-    TensorHf4* thin = tin[0];
+    Shape shin = {n, c, h, w};
+    TensorHf4 thin;
 
+    thin.re_alloc(shin, AK_FLOAT);
+
+    std::vector<TensorHf4*> tvin;
     std::vector<TensorHf4*> tvout_saber;
 
+    tvin.push_back(&thin);
     tvout_saber.push_back(&tout_saber);
 
-    int num = tin[0]->num();
-    int chin = tin[0]->channel();
-    int hin = tin[0]->height();
-    int win = tin[0]->width();
+    LOG(INFO) << "conv param: " << " img_num = " << n << " in_channels = " << c \
+        << " img_h = " << h << " img_w = " << w << " group = " << group \
+        << " pad_width = " << pad_w << " pad_height = " << pad_h << " stride_width = " \
+        << stride_w << " stride_height = " << stride_h << " dilation_w = " << dila_w \
+        << " dilation_h = " << dila_h << " kernel_w = " << kernel_w << " kernel_h = " \
+        << kernel_h << " out_channels = " << ch_out << " bias flag = " \
+        << (is_bias? "true" : "false") << " relu flag = " << (is_relu? "true" : "false");
 
-    LOG(INFO) << "conv param: ";
-    LOG(INFO) << " img_num = " << num;
-    LOG(INFO) << " in_channels = " << chin;
-    LOG(INFO) << " img_h = " << hin;
-    LOG(INFO) << " img_w = " << win;
-    LOG(INFO) << " group = " << group;
-    LOG(INFO) << " pad = " << pad;
-    LOG(INFO) << " stride = " << stride;
-    LOG(INFO) << " dilation = " << dila;
-    LOG(INFO) << " kernel = " << kernel;
-    LOG(INFO) << " out_channels = " << ch_out;
-    LOG(INFO) << " bias flag = " << (bias_flag? "true" : "false");
-    LOG(INFO) << " relu flag = " << (flag_relu? "true" : "false");
+    int kernel_exten = dila_h * (kernel_h - 1) + 1;
+    int hout = (h + 2 * pad_h - kernel_exten) / stride_h + 1;
 
-    int input_dim = tin[0]->height(); // P
-    int kernel_exten = dila * (kernel - 1) + 1;
-    int hout = (input_dim + 2 * pad - kernel_exten) / stride + 1;
+    kernel_exten = dila_w * (kernel_w - 1) + 1;
+    int wout = (w + 2 * pad_w - kernel_exten) / stride_w + 1;
 
-    input_dim = tin[0]->width(); // Q
-    kernel_exten = dila * (kernel - 1) + 1;
-    int wout = (input_dim + 2 * pad - kernel_exten) / stride + 1;
+    if (hout <= 0 || wout <= 0) {
+        return SaberSuccess;
+    }
 
-    Shape shape_out{num, ch_out, hout, wout};
+    Shape shape_out{n, ch_out, hout, wout};
 
-    Shape shw{ch_out, chin / group, kernel, kernel};
+    Shape shw{ch_out, c / group, kernel_h, kernel_w};
     Shape shb{1, ch_out, 1, 1};
     TensorHf4 pweiht(shw);
     TensorHf4 pbias(shb);
 
+    fill_tensor_rand(thin, -1.f, 1.f);
     fill_tensor_rand(pweiht, -1.f, 1.f);
     fill_tensor_rand(pbias, -1.f, 1.f);
-
+//
+//    fill_tensor_const(thin, 1.f);
 //    fill_tensor_const(pweiht, 1.f);
 //    fill_tensor_const(pbias, 1.f);
-
+//    print_tensor(thin);
+//    print_tensor(pweiht);
+//    print_tensor(pbias);
     TensorHf4* bias_ptr = nullptr;
-    if (bias_flag) {
+    if (is_bias) {
         bias_ptr = &pbias;
     }
+    std::vector<float> scale(ch_out, 1.f);
+    const float* din = static_cast<const float*>(thin.data());
 
-    const float* din = thin->data();
-
-    if (compare_result) {
+    if (g_compare_result) {
         LOG(INFO) << "run basic conv for precision comparation";
         tout_basic.re_alloc(shape_out);
-        //size_t workspace_size = sizeof(float) * num * chin * (hin + 2 * pad) * (win + 2 * pad);
-        //void* work_space_data = fast_malloc(workspace_size);
-        float* dout = tout_basic.mutable_data();
-        Sgemm gemmer;
-        conv_arm_basic(din, dout, num, ch_out, hout, wout, chin, hin, win, \
-            pweiht.data(), pbias.data(), group, kernel, kernel, stride, stride, \
-            dila, dila, pad, pad, flag_bias, flag_relu, gemmer, nullptr);
-        //conv_direct_basic1(tout_basic, *thin, pweiht.data(), pbias.data(), group, kernel, \
-        kernel, stride, stride, dila, dila, pad, pad, bias_flag, flag_relu, &gemmer, work_space_data);
-        //fast_free(work_space_data);
-        //print_tensor(tout_basic);
+        fill_tensor_const(tout_basic, 0.f);
+        float* dout = static_cast<float*>(tout_basic.mutable_data());
+        const float* wptr = static_cast<const float*>(pweiht.data());
+        const float* bptr = nullptr;
+        if (is_bias) {
+            bptr = static_cast<const float*>(pbias.data());
+        }
+        conv_basic<float, float>(din, dout, n, ch_out, hout, wout, c, h, w, \
+            wptr, bptr, group, kernel_w, kernel_h, stride_w, stride_h, \
+            dila_w, dila_h, pad_w, pad_h, is_bias, is_relu);
+//        print_tensor(tout_basic);
     }
 
-    SaberConvAct2D conv_lite;
+    SaberConv2D conv_lite;
 
-    ConvAct2DParam param(pweiht.valid_size(), ch_out, group, kernel, kernel, \
-        stride, stride, pad, pad, dila, dila, flag_bias, Active_relu, flag_relu, pweiht.data(), pbias.data());
+    Conv2DParam param(pweiht.valid_size(), ch_out, group, kernel_w, kernel_h, \
+        stride_w, stride_h, pad_w, pad_h, dila_w, dila_h, is_bias, AK_FLOAT, pweiht.data(), scale.data(), pbias.data(), \
+        false, is_relu, Active_relu, 0.f, 0.f, false, nullptr);
 
     conv_lite.load_param(&param);
 
-//    conv_lite.load_param(pweiht.valid_size(), ch_out, group, kernel, kernel, \
-//        stride, stride, pad, pad, dila, dila, flag_bias, pweiht.data(), pbias.data());
-    conv_lite.compute_output_shape(tin, tvout_saber);
+    conv_lite.compute_output_shape(tvin, tvout_saber);
 
     Shape sh_out_saber = tvout_saber[0]->valid_shape();
     LOG(INFO) << "output shape: " << shape_out[0] << ", " << shape_out[1] << ", " \
@@ -154,292 +141,399 @@ void test_arm_conv(std::vector<TensorHf4*>& tin, \
     //! re_alloc mem for output tensor
     tvout_saber[0]->re_alloc(shape_out);
 
-    LOG(INFO) << "saber conv impl init";
-    CHECK_EQ(conv_lite.init(tin, tvout_saber, ctx1), SaberSuccess) << "Saber conv init failed";
+//    LOG(INFO) << "saber conv impl init";
+    auto states = conv_lite.init(tvin, tvout_saber, ctx1);
+    CHECK_EQ(states, SaberSuccess) << "Saber conv init failed";
 
     //! compute
     LOG(INFO) << "saber conv compute";
     to = 0;
-
-    for (int i = 0; i < test_iter; ++i) {
+    for (int i = 0; i < g_test_iter; ++i) {
         t1.clear();
         t1.start();
-        conv_lite.dispatch(tin, tvout_saber);
-        //tvout_saber[0]->record_event(ctx1.get_compute_stream());
-        //tvout_saber[0]->sync();
+        conv_lite.dispatch(tvin, tvout_saber);
         t1.end();
-        to += t1.get_average_ms();
-        if (t1.get_average_ms() < min_time) {
-            min_time = t1.get_average_ms();
+        double ts = t1.get_average_ms();
+        to += ts;
+        if (ts < min_time) {
+            min_time = ts;
         }
     }
-    LOG(INFO) << "saber conv running time, ave: " << to / test_iter << ", min time: " << min_time;
-    //print_tensor(*tvout_saber[0]);
+//    print_tensor(tout_saber);
 
-    if (compare_result) {
+    long long gops = n * ch_out * wout * hout * (c / group) * kernel_w * kernel_h;
+    LOG(INFO) << "saber conv running time, ave: " << to / g_test_iter << ", min time: " << min_time << \
+        ", GOPS: " << 0.000001 * gops / min_time;
+
+    if (g_compare_result) {
         double max_ratio = 0;
         double max_diff = 0;
-        tensor_cmp_host(tout_basic.data(), tout_saber.data(), tout_basic.valid_size(), max_ratio, max_diff);
+        tensor_cmp_host(tout_basic, tout_saber, max_ratio, max_diff);
         LOG(INFO) << "compare result, max diff: " << max_diff << ", max ratio: " << max_ratio;
-        if (fabsf(max_ratio) > 1e-4f) {
-            TensorHf4 tdiff(tout_basic.valid_shape());
-            tensor_diff(tout_basic, tout_saber, tdiff);
-            print_tensor(tdiff);
+        if (fabsf(max_ratio) > 1e-3f) {
+            if (max_diff > 5e-4f) {
+                LOG(WARNING) << "basic result";
+                print_tensor(tout_basic);
+                LOG(WARNING) << "saber result";
+                print_tensor(tout_saber);
+                TensorHf4 tdiff(tout_basic.valid_shape());
+                tensor_diff(tout_basic, tout_saber, tdiff);
+                print_tensor(tdiff);
+                return SaberInvalidValue;
+            }
         }
-        CHECK_EQ(fabsf(max_ratio) < 1e-4f, true) << "compute result error";
     }
+    return SaberSuccess;
 
 }
 
 #if 1
-TEST(TestSaberLite, test_func_conv3x3s1_arm) {
-
-    int num = 1;
-    int chin = 3;
-    int hin = 224;
-    int win = 224;
-
-    int group = 1;
-    int pad = 1;
-    int stride = 1;
-    int dilation = 1;
-    int kernel = 3;
-    int chout = 64;
-
-    bool bias_term = true;
-
-    Shape shape_in(num, chin, hin, win);
-
-    TensorHf4 tdin;
-
-    tdin.re_alloc(shape_in);
-    //fill_tensor_host_rand(tdin, -1.f, 1.f);
-    fill_tensor_const(tdin, 1.f);
-
-    std::vector<TensorHf4*> tin;
-    tin.push_back(&tdin);
-
-    test_arm_conv(tin, chout, kernel, stride, pad, dilation, group, bias_term, threads, cluster);
-    //LOG(WARNING) << "conv3x3s1 not support yet";
-}
-#endif
-#if 1
-TEST(TestSaberLite, test_func_conv3x3s2_arm) {
-
-    int num = 1;
-    int chin = 32;
-    int hin = 112;
-    int win = 112;
-
-    int group = 1;
-    int pad = 1;
-    int stride = 2;
-    int dilation = 1;
-    int kernel = 3;
-    int chout = 64;
-
-    bool bias_term = true;
-
-    Shape shape_in(num, chin, hin, win);
-
-    TensorHf4 tdin;
-
-    tdin.re_alloc(shape_in);
-    fill_tensor_rand(tdin, -1.f, 1.f);
-    //fill_tensor_host_const(tdin, -1.f);
-    std::vector<TensorHf4*> tin;
-    tin.push_back(&tdin);
-
-    test_arm_conv(tin, chout, kernel, stride, pad, dilation, group, bias_term, threads, cluster);
-}
-#endif
-#if 1
-TEST(TestSaberLite, test_func_conv1x1s1_arm) {
-
-    int num = 1;
-    int chin = 32;
-    int hin = 112;
-    int win = 112;
-
-    int group = 1;
-    int pad = 0;
-    int stride = 1;
-    int dilation = 1;
-    int kernel = 1;
-    int chout = 64;
-
-    bool bias_term = true;
-
-    Shape shape_in(num, chin, hin, win);
-
-    TensorHf4 tdin;
-
-    tdin.re_alloc(shape_in);
-    fill_tensor_rand(tdin, -1.f, 1.f);
-    //fill_tensor_host_const(tdin, -1.f);
-    std::vector<TensorHf4*> tin;
-    tin.push_back(&tdin);
-
-    test_arm_conv(tin, chout, kernel, stride, pad, dilation, group, bias_term, threads, cluster);
-}
-#endif
-#if 1
-TEST(TestSaberLite, test_func_conv1x1s2_arm) {
-
-    int num = 1;
-    int chin = 32;
-    int hin = 112;
-    int win = 112;
-
-    int group = 1;
-    int pad = 0;
-    int stride = 2;
-    int dilation = 1;
-    int kernel = 1;
-    int chout = 64;
-
-    bool bias_term = true;
-
-    Shape shape_in(num, chin, hin, win);
-
-    TensorHf4 tdin;
-
-    tdin.re_alloc(shape_in);
-    fill_tensor_rand(tdin, -1.f, 1.f);
-    //fill_tensor_host_const(tdin, -1.f);
-    std::vector<TensorHf4*> tin;
-    tin.push_back(&tdin);
-
-    test_arm_conv(tin, chout, kernel, stride, pad, dilation, group, bias_term, threads, cluster);
-}
-#endif
-#if 1
-TEST(TestSaberLite, test_func_depthwise_conv3x3s1_arm) {
-
-    int num = 1;
-    int chin = 32;
-    int hin = 112;
-    int win = 112;
-
-    int group = chin;
-    int pad = 1;
-    int stride = 1;
-    int dilation = 1;
-    int kernel = 3;
-    int chout = chin;
-
-    bool bias_term = true;
-
-    Shape shape_in(num, chin, hin, win);
-
-    TensorHf4 tdin;
-
-    tdin.re_alloc(shape_in);
-    fill_tensor_rand(tdin, -1.f, 1.f);
-    //fill_tensor_host_const(tdin, 1.f);
-    std::vector<TensorHf4*> tin;
-    tin.push_back(&tdin);
-
-    test_arm_conv(tin, chout, kernel, stride, pad, dilation, group, bias_term, threads, cluster);
-}
-#endif
-#if 1
-TEST(TestSaberLite, test_func_depthwise_conv3x3s2_arm) {
-
-    int num = 1;
-    int chin = 32;
-    int hin = 112;
-    int win = 112;
-
-    int group = chin;
-    int pad = 1;
-    int stride = 2;
-    int dilation = 1;
-    int kernel = 3;
-    int chout = chin;
-
-    bool bias_term = true;
-
-    Shape shape_in(num, chin, hin, win);
-
-    TensorHf4 tdin;
-
-    tdin.re_alloc(shape_in);
-    fill_tensor_rand(tdin, -1.f, 1.f);
-    //fill_tensor_host_const(tdin, 1.f);
-
-    std::vector<TensorHf4*> tin;
-    tin.push_back(&tdin);
-
-    test_arm_conv(tin, chout, kernel, stride, pad, dilation, group, bias_term, threads, cluster);
+//! 3x3dw
+TEST(TestSaberLite, test_conv_depthwise) {
+    if (g_basic_test) {
+    for (auto& batch : {1, 2}) {
+    for (auto& c : {1, 3, 5, 8}) {
+    for (auto& h : {1, 3, 8, 15, 28, 32, 38, 75}) {
+    for (auto& stride : {1, 2}) {
+    for (auto& flag_bias : {false, true}) {
+    for (auto& flag_relu : {false, true}) {
+    for (auto& th : {1, 2, 4}) {
+        int w = h;
+        if (h == 1 && stride == 2) {
+            continue;
+        }
+        auto flag = test_arm_conv(batch, c, h, w, c, 3, 3, stride, stride, 1, 1, 1, 1, c, flag_bias, flag_relu, th, g_cluster);
+        if (flag == SaberSuccess) {
+            LOG(INFO) << "test fp32 depthwise conv: batchsize: " << batch << ", channel: " << c << ", h & w: " << h << \
+                ", stride: " << stride << \
+                ", bias: " << (flag_bias? "true" : "false") << ", relu: " << (flag_relu? "true" : "false") << ", threads: " << \
+                th << ", cluster: " << g_cluster << " passed!!\n";
+        } else {
+            LOG(FATAL) << "test fp32 depthwise conv: batchsize: " << batch << ", channel: " << c << ", h & w: " << h << \
+                ", stride: " << stride << \
+                ", bias: " << (flag_bias? "true" : "false") << ", relu: " << (flag_relu? "true" : "false") << ", threads: " << \
+                th << ", cluster: " << g_cluster << " failed!!\n";
+        }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
 }
 #endif
 
 #if 1
-TEST(TestSaberLite, test_conv_custom_size) {
+//! 5x5dw s1
+TEST(TestSaberLite, test_conv_depthwise_5x5) {
+    if (g_basic_test) {
+    for (auto& batch : {1, 2}) {
+    for (auto& c : {1, 3, 5, 8}) {
+    for (auto& h : {1, 3, 8, 15, 28, 32, 38, 75}) {
+    for (auto& stride : {1,/* 2*/}) {
+    for (auto& flag_bias : {false, true}) {
+    for (auto& flag_relu : {false, true}) {
+    for (auto& th : {1, 2, 4}) {
+        int w = h;
+        if (h == 1 && stride == 2) {
+            continue;
+        }
+        auto flag = test_arm_conv(batch, c, h, w, c, 5, 5, stride, stride, 2, 2, 1, 1, c, flag_bias, flag_relu, th, g_cluster);
+        if (flag == SaberSuccess) {
+            LOG(INFO) << "test fp32 depthwise conv: batchsize: " << batch << ", channel: " << c << ", h & w: " << h << \
+                ", stride: " << stride << \
+                ", bias: " << (flag_bias? "true" : "false") << ", relu: " << (flag_relu? "true" : "false") << ", threads: " << \
+                th << ", cluster: " << g_cluster << " passed!!\n";
+        } else {
+            LOG(FATAL) << "test fp32 depthwise conv: batchsize: " << batch << ", channel: " << c << ", h & w: " << h << \
+                ", stride: " << stride << \
+                ", bias: " << (flag_bias? "true" : "false") << ", relu: " << (flag_relu? "true" : "false") << ", threads: " << \
+                th << ", cluster: " << g_cluster << " failed!!\n";
+        }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+}
+#endif
 
-    int chin = ch_in;
-    int hin = h_in;
-    int win = w_in;
+#if 1
+//! conv1x1s1
+TEST(TestSaberLite, test_conv_1x1s1) {
+    if (g_basic_test) {
+    for (auto& batch : {1, 2}) {
+    for (auto &c : {1, 3, 8}) {
+    for (auto& cout : {1, 5, 16}) {
+    for (auto &g_div : {1, 2, 4}) {
+    for (auto &h : {1, 3, 8, 15, 28, 32, 38, 75}) {
+    for (auto &flag_bias : {false, true}) {
+    for (auto &flag_relu : {false, true}) {
+    for (auto &th : {1, 2, 4}) {
 
-    int dilation = dila;
-    int chout = ch_out;
+        int w = h;
+        int g = g_div;
+        if (c % g != 0 || cout % g != 0) {
+            continue;
+        }
+        auto flag = test_arm_conv(batch, c, h, w, cout, 1, 1, 1, 1, \
+            0, 0, 1, 1, g, flag_bias, flag_relu, th, g_cluster);
+        if (flag == SaberSuccess) {
+            LOG(INFO) << "test fp32 1x1s1 conv: batchsize: " << batch << ", channel: "
+                << c << ", h & w: " << h << ", num_out: " << cout << ", group: " << g << \
+                ", bias: " << (flag_bias ? "true" : "false") << ", relu: "
+                << (flag_relu ? "true" : "false") << ", threads: " << \
+                th << ", cluster: " << g_cluster << " passed!!\n";
+        } else {
+            LOG(FATAL) << "test fp32 1x1s1 conv: batchsize: " << batch << ", channel: "
+                << c << ", h & w: " << h << ", num_out: " << cout << ", group: " << g << \
+                ", bias: " << (flag_bias ? "true" : "false") << ", relu: "
+                << (flag_relu ? "true" : "false") << ", threads: " << \
+                th << ", cluster: " << g_cluster << " failed!!\n";
+        }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+}
+#endif
 
-    bool bias_term = true;
+#if 1
+//! conv3x3s1
+TEST(TestSaberLite, test_conv_3x3s1) {
+    if (g_basic_test) {
+    for (auto& batch : {1, 2}) {
+    for (auto &cin : {1, 3, 8}) {
+    for (auto& cout : {1, 5, 8}) {
+    for (auto &h : {1, 3, 4, 15, 28, 32, 38, 75}) {
+    for (auto &pad : {1, 2}) {
+    for (auto &flag_bias : {false, true}) {
+    for (auto &flag_relu : {false, true}) {
+    for (auto &th : {1, 2, 4}) {
+        int w = h;
+        auto flag = test_arm_conv(batch, cin, h, w, cout, 3, 3, 1, 1, \
+                pad, pad, 1, 1, 1, flag_bias, flag_relu, th, g_cluster);
+        if (flag == SaberSuccess) {
+            LOG(INFO) << "test fp32 3x3s1 conv: batchsize: " << batch << ", channel: "
+                << cin << ", h & w: " << h << ", num_out: " << cout << ", group: " << 1 << \
+                ", bias: " << (flag_bias ? "true" : "false") << ", relu: "
+                << (flag_relu ? "true" : "false") << ", threads: " << \
+                th << ", cluster: " << g_cluster << " passed!!\n";
+        } else {
+            LOG(FATAL) << "test fp32 3x3s1 conv: batchsize: " << batch << ", channel: "
+                << cin << ", h & w: " << h << ", num_out: " << cout << ", group: " << 1 << \
+                ", bias: " << (flag_bias ? "true" : "false") << ", relu: "
+                << (flag_relu ? "true" : "false") << ", threads: " << \
+                th << ", cluster: " << g_cluster << " failed!!\n";
+        }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+}
+#endif
 
-    Shape shape_in(num, chin, hin, win);
+#if 1
+//! conv3x3s2
+TEST(TestSaberLite, test_conv_3x3s2) {
+    if (g_basic_test) {
+        for (auto& batch : {1, 2}) {
+        for (auto &cin : {1, 3, 8}) {
+        for (auto& cout : {1, 5, 8}) {
+        for (auto &g_div : {1, 2, 4}) {
+        for (auto &h : {1, 3, 4, 15, 28, 32, 38, 75}) {
+        for (auto &pad : {1, 2}) {
+        for (auto &flag_bias : {false, true}) {
+        for (auto &flag_relu : {false, true}) {
+        for (auto &th : {1, 2, 4}) {
+            int w = h;
+            int g = g_div;
+            if (cin % g != 0 || cout % g != 0) {
+                continue;
+            }
+            auto flag = test_arm_conv(batch, cin, h, w, cout, 3, 3, 2, 2, \
+                pad, pad, 1, 1, g, flag_bias, flag_relu, th, g_cluster);
+            if (flag == SaberSuccess) {
+                LOG(INFO) << "test fp32 3x3s2 conv: batchsize: " << batch << ", channel: "
+                    << cin << ", h & w: " << h << ", num_out: " << cout << ", group: " << g << \
+                    ", bias: " << (flag_bias ? "true" : "false") << ", relu: "
+                    << (flag_relu ? "true" : "false") << ", threads: " << \
+                    th << ", cluster: " << g_cluster << " passed!!\n";
+            } else {
+                LOG(FATAL) << "test fp32 3x3s2 conv: batchsize: " << batch << ", channel: "
+                    << cin << ", h & w: " << h << ", num_out: " << cout << ", group: " << g << \
+                    ", bias: " << (flag_bias ? "true" : "false") << ", relu: "
+                    << (flag_relu ? "true" : "false") << ", threads: " << \
+                    th << ", cluster: " << g_cluster << " failed!!\n";
+            }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+    }
+}
+#endif
 
-    TensorHf4 tdin;
 
-    tdin.re_alloc(shape_in);
-    fill_tensor_rand(tdin, -1.f, 1.f);
-    //fill_tensor_const(tdin, 1.f);
+#if 1
+//! test conv
+TEST(TestSaberLite, test_conv_gemm) {
+    if (g_basic_test) {
+        for (auto& batch : {1, 2}) {
+        for (auto &cin : {1, 3, 8}) {
+        for (auto& cout : {1, 5, 8}) {
+        for (auto &g_div : {1, 2, 4}) {
+        for (auto &h : {1, 3, 4, 15, 28, 32, 38, 75}) {
+        for (auto& kw : {1, 2, 3, 4, 5}) {
+        for (auto& kh : {1, 2, 3, 4, 5}) {
+        for (auto& stride : {1, 2}) {
+        for (auto& dila : {1, 2}) {
+        for (auto &pad : {0, 1, 2}) {
+        for (auto &flag_bias : {false, true}) {
+        for (auto &flag_relu : {false, true}) {
+        for (auto &th : {1, 2, 4}) {
+            int w = h;
+            int g = g_div;
+            if (cin % g != 0 || cout % g != 0) {
+                continue;
+            }
+            auto flag = test_arm_conv(batch, cin, h, w, cout, kw, kh, stride, stride, \
+                pad, pad, dila, dila, g, flag_bias, flag_relu, th, g_cluster);
+            if (flag == SaberSuccess) {
+                LOG(INFO) << "test fp32 gemm conv: batchsize: " << batch << ", channel: "
+                    << cin << ", h & w: " << h << ", num_out: " << cout << ", group: " << g << \
+                    ", kernel_w: " << kw << ", kernel_h: " << kh << ", stride: " << stride << \
+                    ", dila: " << dila << ", pad: " << pad << ", bias: " << \
+                    (flag_bias ? "true" : "false") << ", relu: "
+                    << (flag_relu ? "true" : "false") << ", threads: " << \
+                    th << ", cluster: " << g_cluster << " passed!!\n";
+            } else {
+                LOG(FATAL) << "test fp32 gemm conv: batchsize: " << batch << ", channel: "
+                    << cin << ", h & w: " << h << ", num_out: " << cout << ", group: " << g << \
+                    ", kernel_w: " << kw << ", kernel_h: " << kh << ", stride: " << stride << \
+                    ", dila: " << dila << ", pad: " << pad << ", bias: " << \
+                    (flag_bias ? "true" : "false") << ", relu: "
+                           << (flag_relu ? "true" : "false") << ", threads: " << \
+                    th << ", cluster: " << g_cluster << " FAILED!!\n";
+            }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+    }
+}
+#endif
 
-    std::vector<TensorHf4*> tin;
-    tin.push_back(&tdin);
-
-    test_arm_conv(tin, chout, kernel, stride, pad, dilation, group, bias_term, threads, cluster);
+#if 1
+TEST(TestSaberLite, test_conv_fp32_custom_size) {
+    auto flag = test_arm_conv(g_num, g_ch_in, g_h_in, g_w_in, g_ch_out, g_kw, g_kh, g_stride_w, g_stride_h, \
+            g_pad_w, g_pad_h, g_dila_w, g_dila_h, g_group, g_flag_bias, g_flag_relu, g_threads, g_cluster);
+    if (flag == SaberSuccess) {
+        LOG(INFO) << "test fp32 conv: batchsize: " << g_num << ", channel: "
+            << g_ch_in << ", h & w: " << g_h_in << \
+            ", bias: " << (g_flag_bias ? "true" : "false") << ", relu: "
+            << (g_flag_relu ? "true" : "false") << ", threads: " << \
+            g_threads << ", cluster: " << g_cluster << " passed!!\n";
+    } else {
+        LOG(INFO) << "test fp32 conv: batchsize: " << g_num << ", channel: "
+            << g_ch_in << ", h & w: " << g_h_in << \
+            ", bias: " << (g_flag_bias ? "true" : "false") << ", relu: "
+            << (g_flag_relu ? "true" : "false") << ", threads: " << \
+            g_threads << ", cluster: " << g_cluster << " failed!!\n";
+    }
 }
 #endif
 
 int main(int argc, const char** argv){
     Env::env_init();
+    LOG(ERROR) << "usage: ./" << argv[0] << " basic_test cluster  threads  test_iter " << \
+                " compare_result flag_bias flag_relu num ch_in h_in w_in ch_out group" << \
+                " kernel pad stride dila [kernel_h] [pad_h] [stride_h] [dila_h]";
 
     if (argc >= 2) {
-        cluster = atoi(argv[1]);
+        g_basic_test = atoi(argv[1]) > 0;
     }
+
     if (argc >= 3) {
-        threads = atoi(argv[2]);
+        g_cluster = atoi(argv[2]);
     }
     if (argc >= 4) {
-        test_iter = atoi(argv[3]);
+        g_threads = atoi(argv[3]);
     }
     if (argc >= 5) {
-        compare_result = atoi(argv[4]) > 0;
+        g_test_iter = atoi(argv[4]);
     }
     if (argc >= 6) {
-        flag_bias = atoi(argv[5]) > 0;
+        g_compare_result = atoi(argv[5]) > 0;
     }
     if (argc >= 7) {
-        flag_relu = atoi(argv[6]) > 0;
+        g_flag_bias = atoi(argv[6]) > 0;
     }
-    if(argc >= 8) {
-        if (argc < 17) {
-            LOG(ERROR) << "usage: ./" << argv[0] << " cluster  threads  test_iter " << \
+    if (argc >= 8) {
+        g_flag_relu = atoi(argv[7]) > 0;
+    }
+    if (argc >= 9) {
+        if (argc < 18) {
+            LOG(FATAL) << "usage: ./" << argv[0] << " basic_test cluster  threads  test_iter " << \
                 " compare_result flag_bias flag_relu num ch_in h_in w_in ch_out group" << \
-                " kernel pad stride dila";
-            return 0;
+                " kernel pad stride dila [kernel_h] [pad_h] [stride_h] [dila_h]";
+            return -1;
         }
-        num = atoi(argv[7]);
-        ch_in = atoi(argv[8]);
-        h_in = atoi(argv[9]);
-        w_in = atoi(argv[10]);
-        ch_out = atoi(argv[11]);
-        group = atoi(argv[12]);
-        kernel = atoi(argv[13]);
-        pad = atoi(argv[14]);
-        stride = atoi(argv[15]);
-        dila = atoi(argv[16]);
+        g_num = atoi(argv[8]);
+        g_ch_in = atoi(argv[9]);
+        g_h_in = atoi(argv[10]);
+        g_w_in = atoi(argv[11]);
+        g_ch_out = atoi(argv[12]);
+        g_group = atoi(argv[13]);
+        g_kw = atoi(argv[14]);
+        g_kh = g_kw;
+        g_pad_w = atoi(argv[15]);
+        g_pad_h = g_pad_w;
+        g_stride_w = atoi(argv[16]);
+        g_stride_h = g_stride_w;
+        g_dila_w = atoi(argv[17]);
+        g_dila_h = g_dila_w;
+    }
+    if (argc > 18) {
+        g_kh = atoi(argv[18]);
+    }
+    if (argc > 19) {
+        g_pad_h = atoi(argv[19]);
+    }
+    if (argc > 20) {
+        g_stride_h = atoi(argv[20]);
+    }
+    if (argc > 21) {
+        g_dila_h = atoi(argv[21]);
     }
 
     // initial logger

@@ -10,60 +10,49 @@
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
-   limitations under the License. 
+   limitations under the License.
 */
 
 #ifndef ANAKIN_SABER_FUNCS_POOLING_WITH_INDEX_H
 #define ANAKIN_SABER_FUNCS_POOLING_WITH_INDEX_H
 
+#include "saber/funcs/impl/impl_pooling_with_index.h"
+
 #include "saber/funcs/base.h"
 #include "saber/funcs/impl/impl_base.h"
-#include "saber/funcs/impl/impl_pooling_with_index.h"
+
+#ifdef AMD_GPU
+#include "saber/funcs/impl/amd/include/saber_pooling_with_index.h"
+#endif
 #ifdef NVIDIA_GPU
 #include "saber/funcs/impl/cuda/saber_pooling_with_index.h"
 #endif
-
 #ifdef USE_X86_PLACE
-#include "saber/funcs/impl/impl_pooling_with_index.h"
-#endif
-#ifdef USE_ARM_PLACE
-//todo
-#include "saber/funcs/impl/impl_pooling_with_index.h"
+#include "saber/funcs/impl/x86/saber_pooling_with_index.h"
 #endif
 namespace anakin {
 namespace saber {
 
 template<typename TargetType,
-        DataType OpDtype,
-        DataType inDtype = AK_FLOAT,
-        DataType outDtype = AK_FLOAT,
-        typename LayOutType_op = NCHW,
-        typename LayOutType_in = NCHW,
-        typename LayOutType_out = NCHW
->
+        DataType OpDtype>
 class PoolingWithIndex : public BaseFunc<
-        Tensor<TargetType, inDtype, LayOutType_in>,
-        Tensor<TargetType, outDtype, LayOutType_out>,
-        Tensor<TargetType, OpDtype, LayOutType_op>,
+        TargetType,
+        OpDtype,
         ImplBase,
         PoolingParam
 > {
 public:
     using BaseFunc<
-            Tensor<TargetType, inDtype, LayOutType_in>,
-            Tensor<TargetType, outDtype, LayOutType_out>,
-            Tensor<TargetType, OpDtype, LayOutType_op>,
+            TargetType,
+            OpDtype,
             ImplBase,
             PoolingParam>::BaseFunc;
 
     PoolingWithIndex() = default;
 
-    typedef Tensor<TargetType, inDtype, LayOutType_in> InDataTensor;
-    typedef Tensor<TargetType, outDtype, LayOutType_out> OutDataTensor;
-    typedef Tensor<TargetType, OpDtype, LayOutType_op> OpTensor;
-    typedef PoolingParam<OpTensor> Param_t;
-    typedef std::vector<InDataTensor *> Input_v;
-    typedef std::vector<OutDataTensor *> Output_v;
+    typedef PoolingParam<TargetType> Param_t;
+    typedef std::vector<Tensor<TargetType> *> Input_v;
+    typedef std::vector<Tensor<TargetType> *> Output_v;
     typedef std::vector<Shape> Shape_v;
 
     virtual SaberStatus compute_output_shape(const Input_v& input, Output_v &output, \
@@ -115,13 +104,13 @@ public:
     virtual SaberStatus init_impl(ImplEnum implenum) override {
         switch (implenum) {
             case VENDER_IMPL:
-                this->_impl.push_back(new VenderPoolingWithIndex <TargetType, OpDtype, inDtype, outDtype,
-                LayOutType_op, LayOutType_in, LayOutType_out>);
+                this->_impl.push_back(new VenderPoolingWithIndex <TargetType,
+                        OpDtype>);
                 return SaberSuccess;
 
             case SABER_IMPL:
-                this->_impl.push_back(new SaberPoolingWithIndex <TargetType, OpDtype, inDtype, outDtype,
-                LayOutType_op, LayOutType_in, LayOutType_out>);
+                this->_impl.push_back(new SaberPoolingWithIndex <TargetType,
+                        OpDtype>);
                 return SaberSuccess;
 
             default:

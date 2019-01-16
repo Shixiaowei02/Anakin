@@ -9,7 +9,6 @@ from caffe_helper import *
 from caffe_layer_param_transmit import *
 from Queue import Queue
 
-
 class CaffeParser:
     """
     """
@@ -25,6 +24,7 @@ class CaffeParser:
         self.ProtoPaths = caffe_config_dict['ProtoPaths']
         self.PrototxtPath = caffe_config_dict['PrototxtPath'] 
         self.ModelPath = caffe_config_dict['ModelPath']
+        self.Remark = caffe_config_dict['Remark']
 
     def __call__(self):
         """
@@ -41,6 +41,7 @@ class CaffeParser:
         self._FilterNet()
         self._SplitInception(False)
         self._InsSplitBtwSliceConcat()
+        self._InsSplitBtwSliceEltwise()
         self._InsertSplits()
         self._ScatterInputLayer()
         # create input node
@@ -48,13 +49,9 @@ class CaffeParser:
 
     
     def _SplitInception(self, is_weight):
-        print is_weight
         net = self.net_parameter
-        
         if is_weight:
             net = self.net_param_weights
-        else:
-            print net
         layers = net.layers or net.layer;
         new_layers = []
         net_param  = NetParameter()
@@ -65,15 +62,10 @@ class CaffeParser:
                     if blob in blob_name_dict:
                         layer.bottom[b_id] = blob_name_dict[blob]
                 new_layers.append(layer)
-                if is_weight:
-                    if (layer.type == "Slice"):
-                        print layer
             else:
                 for b_id, blob in enumerate(layer.bottom):
                     if blob in blob_name_dict:
                         layer.bottom[b_id] = blob_name_dict[blob]
-                #if is_weight:
-                    #print layer
                 inception_top = layer.top
                 bottom_name = layer.bottom
                 inception_param = layer.inception_param
@@ -85,10 +77,6 @@ class CaffeParser:
                 blob_id = 0
                 inception = []
                 blobs = layer.blobs
-                if len(blobs) != 0:
-                     print "****************************************"
-                     for b in blobs:
-                         print "inception blob shape", b.shape
                 for cl_id, column in enumerate(columns):
                     convs = column.convolution_param
                     col_name = inception_top[0] + "_" + column.column_name
@@ -110,11 +98,8 @@ class CaffeParser:
                          inception.append(conv_layer)
                          if len(blobs) != 0:
                              if conv_layer.convolution_param.bias_term:
-                             #    conv_layer.blobs.append(blobs[blob_id])
-                             #    conv_layer.blobs.append(blobs[blob_id+1])
                                  blob_id += 2
                              else:
-                             #    conv_layer.blobs.append(blobs[blob_id+1])
                                  blob_id += 1
                          bottom = top
                          if (need_relu):
@@ -162,11 +147,7 @@ class CaffeParser:
                     bottom = inception_top[0]
                 else:
                     blob_name_dict[inception_top[0]] = bottom
-                
                 new_layers.extend(inception)
-                #print inception
-                #for com in inception:
-                #    new_layers.append(com)
         if is_weight:
             if self.net_param_weights.layers:
                 del self.net_param_weights.layers[:]
@@ -216,7 +197,7 @@ class CaffeParser:
                 logger(verbose.FATAL).feed("[ Upgrade Level 1 ]  Details: need to upgrade from V0 to V1 [ FAILED ]")
                 exit()
         if NetNeedsDataUpgrade(self.net_parameter):
-            logger(verbose.ERROR).feed("[ Upgrade Level 2 ] Details: need Data upgrade [ IGNORED ]")
+            logger(verbose.WARNING).feed("[ Upgrade Level 2 ] Details: need Data upgrade [ IGNORED ]")
         if NetNeedsV1ToV2Upgrade(self.net_parameter):
             logger(verbose.INFO).feed("[ Upgrade Level 3 ] Details: need to upgrade from V1 to V2 [ ... ]")
             original_param = NetParameter()
@@ -267,6 +248,37 @@ class CaffeParser:
             del self.net_parameter.layers[:]
             self.net_parameter.layers.extend(new_param.layer)
 
+    def _InsSplitBtwSliceEltwise(self):
+        '''
+        Currently, the connection between Slice and Concat must be implemented via Split.
+        '''
+        layers = self.net_parameter.layer or self.net_parameter.layers
+        top_blobs_of_slices = list()
+        btm_blobs_of_concats = list()
+        for layer in layers:
+            if layer.type == 'Slice':
+                top_blobs_of_slices.extend(layer.top)
+            elif layer.type == 'Eltwise':
+                btm_blobs_of_concats.extend(layer.bottom)
+        intersection_blobs = list(set(top_blobs_of_slices).intersection(set(btm_blobs_of_concats)))
+        new_param = NetParameter()
+        for layer in layers:
+            new_layer = new_param.layer.add()
+            new_layer.CopyFrom(layer)
+            if layer.type == 'Slice':
+                for top_blob in layer.top:
+                    if top_blob in intersection_blobs:
+                        split_param = new_param.layer.add()
+                        split_param.bottom.append(top_blob)
+                        split_param.top.append(top_blob)
+                        split_param.name = 'Split_' + top_blob
+                        split_param.type = 'Split'
+        if self.net_parameter.layer:
+            del self.net_parameter.layer[:]
+            self.net_parameter.layer.extend(new_param.layer)
+        else:
+            del self.net_parameter.layers[:]
+            self.net_parameter.layers.extend(new_param.layer)
 
     def _InsertSplits(self):
         """
@@ -462,6 +474,22 @@ class CaffeParser:
                     self.graphIO.add_node(node_io())
                     self.graphIO.add_in(in_name)
 
+    def _DealWithRemark(self, layer_type, nodeIO, mlayer, rlayer, tensors, opIO):
+        if self.Remark == 'FaceUniqueBatchNorm':
+            if len(tensors) > 3 and layer_type == "BatchNorm": # this is for Face unique Batchnorm layer(batchnorm + scale)
+                scale_node_io, scale_layer, scale_op_io = self._CreateScaleOpForFaceUniqueBatchNorm(source_layer_name)
+                CAFFE_LAYER_PARSER["Scale"](scale_node_io, scale_layer, tensors[3:5], scale_op_io)
+                self.graphIO.add_node(scale_node_io())
+                CAFFE_LAYER_PARSER[layer_type](nodeIO, mlayer, tensors[0:3], opIO)
+            else:
+                CAFFE_LAYER_PARSER[layer_type](nodeIO, rlayer, tensors, opIO)
+        elif self.Remark == 'Training':
+            if layer_type == "BatchNorm":
+                private_data = {'use_global_stats': True}
+                CAFFE_LAYER_PARSER["Normalize"](nodeIO, mlayer, [], opIO, private_data)
+            else:
+                CAFFE_LAYER_PARSER[layer_type](nodeIO, rlayer, tensors, opIO)
+
     def _Parsing_new(self):
         """
         Parsering caffe model and caffe net file.
@@ -489,10 +517,10 @@ class CaffeParser:
                     blob_top_to_layer_name[top].put(tmp_rlayer.name)
         # set graph proto's name
         self.graphIO.set_name(self.net_parameter.name)
-        logger(verbose.ERROR).feed(" [CAFFE] Archtecture Parsing ...")
+        logger(verbose.INFO).feed(" [CAFFE] Archtecture Parsing ...")
 
         # parsing model
-        logger(verbose.ERROR).feed(" [CAFFE] Model Parameter Parsing ...")
+        logger(verbose.INFO).feed(" [CAFFE] Model Parameter Parsing ...")
         self._ParserModel()
         self._SplitInception(True)
         model_layers = self.net_param_weights.layers or self.net_param_weights.layer
@@ -560,14 +588,11 @@ class CaffeParser:
                                 tensor.set_data(blob.data, "float")
                                 tensors.append(tensor)
                     # fill node with layerparameter, such as axis kernel_size... and tensors
-                    if len(tensors) > 3 and source_layer_type == "BatchNorm": # this is for Face unique Batchnorm layer(batchnorm + scale)
-                        scale_node_io, scale_layer, scale_op_io = self._CreateScaleOpForFaceUniqueBatchNorm(source_layer_name)
-                        CAFFE_LAYER_PARSER["Scale"](scale_node_io, scale_layer, tensors[3:5], scale_op_io)
-                        self.graphIO.add_node(scale_node_io())
-                        CAFFE_LAYER_PARSER[source_layer_type](nodeIO, mlayer, tensors[0:3], opIO)
-                    else:
+                    if self.Remark is None:
                         # besides, set the name of opIO
                         CAFFE_LAYER_PARSER[source_layer_type](nodeIO, rlayer, tensors, opIO) # call parser automatically
+                    else:
+                        self._DealWithRemark(source_layer_type, nodeIO, mlayer, rlayer, tensors, opIO)
                     match_in_model_layer = True
                     # TODO... over!
                 else: # not find
@@ -610,10 +635,10 @@ class CaffeParser:
                 #blob_btm_to_layer_name[top] = tmp_rlayer.name
         # set graph proto's name
         self.graphIO.set_name(self.net_parameter.name)
-        logger(verbose.ERROR).feed(" [CAFFE] Archtecture Parsing ...")
+        logger(verbose.WARNING).feed(" [CAFFE] Archtecture Parsing ...")
 
         # parsing model
-        logger(verbose.ERROR).feed(" [CAFFE] Model Parameter Parsing ...")
+        logger(verbose.WARNING).feed(" [CAFFE] Model Parameter Parsing ...")
         self._ParserModel()
         #self._SplitInception(True)
         model_layers = self.net_param_weights.layers or self.net_param_weights.layer
@@ -679,14 +704,13 @@ class CaffeParser:
                                 tensor.set_data(blob.data, "float")
                                 tensors.append(tensor)
                     # fill node with layerparameter, such as axis kernel_size... and tensors
-                    if len(tensors) > 3 and source_layer_type == "BatchNorm": # this is for Face unique Batchnorm layer(batchnorm + scale)
-                        scale_node_io, scale_layer, scale_op_io = self._CreateScaleOpForFaceUniqueBatchNorm(source_layer_name)
-                        CAFFE_LAYER_PARSER["Scale"](scale_node_io, scale_layer, tensors[3:5], scale_op_io)
-                        self.graphIO.add_node(scale_node_io())
-                        CAFFE_LAYER_PARSER[source_layer_type](nodeIO, mlayer, tensors[0:3], opIO)
-                    else:
+                    if self.Remark is None:
                         # besides, set the name of opIO
-                        CAFFE_LAYER_PARSER[source_layer_type](nodeIO, rlayer, tensors, opIO) # call parser automatically
+                        CAFFE_LAYER_PARSER[source_layer_type](nodeIO, rlayer, tensors, opIO)
+                        # call parser automatically
+                    else:
+                        self._DealWithRemark(source_layer_type, nodeIO, \
+                        mlayer, rlayer, tensors, opIO)
                     match_in_model_layer = True
                     # TODO... over!
                 else: # not find
@@ -694,7 +718,8 @@ class CaffeParser:
             if not match_in_model_layer:
                 # fill node with layerparameter, such as axis kernel_size... but with [ ] tensors (empty)
                 # besides, set the name of opIO
-                CAFFE_LAYER_PARSER[source_layer_type](nodeIO, rlayer, [], opIO) # call parser automatically
+                CAFFE_LAYER_PARSER[source_layer_type](nodeIO, rlayer, [], opIO)
+                # call parser automatically
             # add node to graph io
             self.graphIO.add_node(nodeIO())
 

@@ -16,6 +16,7 @@ TEST(TestSaberLite, test_arm_context) {
     LOG(INFO) << "set active ids";
 
     LOG(INFO) << "test threads activated";
+#ifdef USE_OPENMP
 #pragma omp parallel
     {
         int threads = omp_get_num_threads();
@@ -109,6 +110,7 @@ TEST(TestSaberLite, test_arm_context) {
         printf("thread1 core ID: %d\n", th_id);
 
     }
+#endif
 }
 
 int main(int argc, const char** argv){

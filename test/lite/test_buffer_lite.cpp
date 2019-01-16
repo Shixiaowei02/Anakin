@@ -17,7 +17,7 @@ void test_buffer(){
 
     tmp_ptr = fast_malloc(n0 * sizeof(Dtype));
     arm_ptr = static_cast<Dtype*>(tmp_ptr);
-    for(int i = 0; i < n0; i++){
+    for (int i = 0; i < n0; i++){
         arm_ptr[i] = static_cast<Dtype>(i);
     }
 
@@ -51,7 +51,7 @@ void test_buffer(){
     LOG(INFO) << "deep copy between two host buffer: ";
     Dtype* data_ptr1 = (Dtype*)arm_buf1.get_data();
     LOG(INFO) << "data in buffer 1";
-    for(int i = 0; i < n0;i++) {
+    for (int i = 0; i < n0; i++) {
         printf("%.2f ", data_ptr1[i]);
         if ((i + 1) % 10 == 0) {
             printf("\n");
@@ -60,7 +60,7 @@ void test_buffer(){
     printf("\n");
     Dtype* data_ptr2 = (Dtype*)arm_buf2.get_data();
     LOG(INFO) << "data in buffer2";
-    for(int i = 0; i < n0;i++) {
+    for (int i = 0; i < n0; i++) {
         printf("%.2f ", data_ptr2[i]);
         if ((i + 1) % 10 == 0) {
             printf("\n");

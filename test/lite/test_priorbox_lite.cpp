@@ -9,26 +9,9 @@ int threads = 1;
 
 const bool FLAG_RELU = false;
 
-typedef Tensor<CPU, AK_FLOAT> TensorHf4;
+typedef Tensor<CPU> TensorHf4;
 
-template <typename Tensor_t>
-void tensor_diff(Tensor_t& t1, Tensor_t& t2, Tensor_t& tdiff) {
-
-    typedef typename Tensor_t::Dtype dtype;
-    int size1 = t1.valid_size();
-    int size2 = t2.valid_size();
-    int size_out = tdiff.valid_size();
-            CHECK_EQ(size1, size2) << "wrong shape";
-            CHECK_EQ(size1, size_out) << "wrong shape";
-    const dtype* ptr1 = t1.data();
-    const dtype* ptr2 = t2.data();
-    dtype* ptr_out = tdiff.mutable_data();
-    for (int i = 0; i < size1; ++i) {
-        ptr_out[i] = ptr1[i] - ptr2[i];
-    }
-}
-
-test_arm_priorbox(std::vector<TensorHf4*>& tin, \
+void test_arm_priorbox(std::vector<TensorHf4*>& tin, \
     int thread_num, int cluster_id) {
 
     double to = 0;
@@ -90,7 +73,7 @@ test_arm_priorbox(std::vector<TensorHf4*>& tin, \
 
     priorbox_saber.compute_output_shape(tin, tvout_saber);
     Shape sh_out_saber = tvout_saber[0]->valid_shape();
-    Shape shape_out{1, 1, 2, tin[0]->width() * tin[0]->height() * 4 * param._prior_num};
+    Shape shape_out{1, 2, tin[0]->width() * tin[0]->height() * 4 * param._prior_num};
 
     LOG(INFO) << "output shape: " << shape_out[0] << ", " << shape_out[1] << ", " \
         << shape_out[2] << ", " << shape_out[3];

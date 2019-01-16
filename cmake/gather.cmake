@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 # find cudnn default cudnn 5
 if(USE_CUDNN)
     anakin_find_cudnn()
@@ -23,10 +24,23 @@ if(USE_CUDA)
     anakin_find_cuda()
 endif()
 
+if(USE_BM_PLACE)
+    anakin_find_bmlib()
+endif()
+
+# find openssl
+if(USE_OPENSSL)
+    anakin_find_openssl()
+endif()
+
+# find openssl
+if(USE_OPENSSL)
+    anakin_find_openssl()
+endif()
 
 # find opencl
 if(USE_OPENCL)
-    anakin_generate_kernel(${ANAKIN_ROOT})
+    #anakin_generate_kernel(${ANAKIN_ROOT})
     anakin_find_opencl()
 endif()
 
@@ -46,7 +60,14 @@ endif()
 
 if(USE_PROTOBUF)
     anakin_find_protobuf()
-    anakin_protos_processing()
+endif()
+
+if(USE_NANOPB)
+    anakin_find_nanopb()
+endif()
+
+if(BUILD_RPC)
+    anakin_find_baidu_rpc()
 endif()
 
 if (USE_GFLAGS)
@@ -76,14 +97,23 @@ if(USE_OPENMP)
     anakin_find_openmp()
 endif()
 
-#if(USE_ARM_PLACE)
-#    if(TARGET_ANDROID)
-#		if(USE_OPENMP)
-#        	anakin_find_openmp()
-#		endif()
-#    elseif(TARGET_IOS)
-#        message(STATUS " TARGET_IOS error")
-#    else()
-#        message(FATAL_ERROR " ARM TARGET unknown !")
-#    endif()
-#endif()
+if(USE_ARM_PLACE)
+    if(TARGET_ANDROID)
+		if(USE_OPENMP)
+        	anakin_find_openmp()
+		endif()
+    elseif(TARGET_IOS)
+        message(STATUS " TARGET_IOS error")
+    else()
+        message(FATAL_ERROR " ARM TARGET unknown !")
+    endif()
+endif()
+
+if(USE_SGX)
+    anakin_find_sgx()
+endif()
+
+# find miopengemm
+if(USE_MIOPENGEMM)
+    anakin_find_miopengemm()
+endif()

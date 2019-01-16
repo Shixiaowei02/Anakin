@@ -16,72 +16,108 @@
 #ifndef ANAKIN_SABER_FUNCS_DEBUG_H
 #define ANAKIN_SABER_FUNCS_DEBUG_H
 
+#include "anakin_config.h"
+
+#ifndef USE_SGX
+
 #include "tensor.h"
 namespace anakin {
 namespace saber {
 
-#if defined(USE_X86_PLACE) || defined(USE_CUDA)
+template <typename Target_Type>
+struct DefaultHostType {
+    typedef X86 Host_type;
+};
 
-template <typename TTensor>
-void record_tensor_to_file(TTensor& dev_tensor,const char* locate){
-    Tensor <X86, AK_FLOAT, NCHW> host_temp;
-    host_temp.re_alloc(dev_tensor.valid_shape());
-    host_temp.copy_from(dev_tensor);
-    FILE* fp = fopen(locate, "w+");
-
-    if (fp == 0) {
-        CHECK(false) << "file open failed " << locate;
-
-    } else {
-        for (int i = 0; i < host_temp.valid_size(); ++i) {
-            fprintf(fp, "[%d] %g \n", i, (host_temp.data()[i]));
-        }
-
-        fclose(fp);
-        LOG(INFO) << "!!! write success: " << locate;
-    }
-}
-static void write_tensorfile(Tensor <X86, AK_FLOAT, NCHW> tensor, const char* locate) {
-    typedef typename Tensor<X86, AK_FLOAT, NCHW>::Dtype Dtype;
-    LOG(INFO) << "host tensor data:" << tensor.size();
-    FILE* fp = fopen(locate, "w+");
-
-    if (fp == 0) {
-        LOG(ERROR) << "file open field " << locate;
-
-    } else {
-        const Dtype* data_ptr = static_cast<const Dtype*>(tensor.data());
-        int size = tensor.valid_size();
-
-        for (int i = 0; i < size; ++i) {
-            fprintf(fp, "[%d] %g \n", i, (data_ptr[i]));
-        }
-
-        fclose(fp);
-    }
-
-    LOG(INFO) << "!!! write success: " << locate;
-}
-#endif
-template <typename TargetType>
-static void record_dev_tensorfile(const float* dev_tensor, int size, const char* locate){};
-
-#ifdef USE_CUDA
 template <>
-void record_dev_tensorfile<NV>(const float* dev_tensor, int size, const char* locate) {
-    Tensor <X86, AK_FLOAT, NCHW> host_temp;
-    host_temp.re_alloc(Shape(1, 1, 1, size));
-    CUDA_CHECK(cudaMemcpy(host_temp.mutable_data(), dev_tensor, sizeof(float) * size,
-                          cudaMemcpyDeviceToHost));
-    cudaDeviceSynchronize();
+struct DefaultHostType<NV> {
+    typedef NVHX86 Host_type;
+};
+
+template <>
+struct DefaultHostType<ARM> {
+    typedef ARM Host_type;
+};
+
+template <typename HostType>
+static void reorder_nchwc8_nchw(Tensor<HostType>& input,
+                                Tensor<HostType>& output) {
+
+    CHECK_EQ(input.get_dtype(), AK_FLOAT) << "only support float type";
+    Shape shape = output.valid_shape();
+    int n_value = shape[0];
+    int c_value = shape[1];
+    int h_value = shape[2];
+    int w_value = shape[3];
+    Shape shape_input = input.valid_shape();
+    int c_round_div8 = shape_input[1];
+
+    if (input.get_layout() == Layout_NCHW_C8R) {
+        c_round_div8 = (shape_input.channel() + 7) / 8;
+    }
+
+    float* output_ptr = static_cast<float*>(output.mutable_data());
+    const float* input_ptr = static_cast<const float*>(input.data());
+    #pragma omp parallel for collapse(4) schedule(static)
+
+    for (int n = 0; n < n_value; ++n) {
+        for (int c = 0; c < c_value; ++c) {
+            for (int h = 0; h < h_value; ++h) {
+                //#pragma ivdep
+                for (int w = 0; w < w_value; ++w) {
+                    int round_c = c / 8;
+                    int remainder_c = c % 8;
+                    int input_idx = n * c_round_div8 * h_value * w_value * 8 + round_c * h_value * w_value * 8 +
+                                    h * w_value * 8 + w * 8 + remainder_c;
+                    int output_idx = n * c_value * h_value * w_value + c * h_value * w_value  +
+                                     h * w_value  + w ;
+
+                    *(output_ptr + output_idx) = input_ptr[input_idx];
+                }
+            }
+        }
+    }
+
+}
+
+template <typename Target_Type>
+static void write_tensorfile(const Tensor<Target_Type>& tensor, const char* locate) {
+
+    typedef typename DefaultHostType<Target_Type>::Host_type HOST_TYPE;
+    Tensor<HOST_TYPE> host_tensor;
+    host_tensor.re_alloc(tensor.valid_shape(), tensor.get_dtype());
+    host_tensor.copy_from(tensor);
+
+    if (host_tensor.get_layout() == Layout_NCHW_C8R) {
+        Tensor<HOST_TYPE> temp_tensor(host_tensor.valid_shape());
+        temp_tensor.copy_from(host_tensor);
+        Shape old_shape = host_tensor.valid_shape();
+        host_tensor.reshape(Shape({old_shape[0], old_shape[1], old_shape[2], old_shape[3]}));
+        reorder_nchwc8_nchw(temp_tensor, host_tensor);
+    }
+
+    LOG(INFO) << "target tensor data:" << tensor.valid_size();
     FILE* fp = fopen(locate, "w+");
 
-    if (fp == 0) {
-        LOG(ERROR) << "file open failed " << locate;
-
+    if (fp == nullptr) {
+        LOG(ERROR) << "file open field " << locate;
     } else {
-        for (int i = 0; i < size; ++i) {
-            fprintf(fp, "[%d] %g \n", i, (host_temp.data()[i]));
+        if (tensor.get_dtype() == AK_FLOAT) {
+            const float* data_ptr = (const float*)host_tensor.data();
+            int size = host_tensor.valid_size();
+
+            for (int i = 0; i < size; ++i) {
+                fprintf(fp, "[%d] %f \n", i, (data_ptr[i]));
+            }
+        } else if (tensor.get_dtype() == AK_INT8) {
+            const char* data_ptr = (const char*)host_tensor.data();
+            int size = host_tensor.valid_size();
+
+            for (int i = 0; i < size; ++i) {
+                fprintf(fp, "[%d] %d \n", i, (data_ptr[i]));
+            }
+        } else {
+            LOG(FATAL) << "not supported write type";
         }
 
         fclose(fp);
@@ -89,103 +125,65 @@ void record_dev_tensorfile<NV>(const float* dev_tensor, int size, const char* lo
 
     LOG(INFO) << "!!! write success: " << locate;
 }
-static void record_dev_tensorfile(Tensor <NV, AK_FLOAT, NCHW>* dev_tensor, const char* locate) {
-    Tensor <X86, AK_FLOAT, NCHW> host_temp;
-    int size=dev_tensor->valid_size();
-    host_temp.re_alloc(Shape(1, 1, 1, size));
-    CUDA_CHECK(cudaMemcpy(host_temp.mutable_data(), dev_tensor->data(), sizeof(float) * size,
-                          cudaMemcpyDeviceToHost));
-    cudaDeviceSynchronize();
-    FILE* fp = fopen(locate, "w+");
 
-    if (fp == 0) {
-                LOG(ERROR) << "file open failed " << locate;
+static std::string& replace_all(std::string&   str, const  std::string&  old_value,
+                                const  std::string&  new_value) {
+    while (true) {
+        std::string::size_type pos(0);
 
-    } else {
-        for (int i = 0; i < size; ++i) {
-            fprintf(fp, "[%d] %g \n", i, (host_temp.data()[i]));
+        if ((pos = str.find(old_value)) != std::string::npos) {
+            str.replace(pos, old_value.length(), new_value);
+        } else  {
+            break;
         }
-
-        fclose(fp);
     }
 
-            LOG(INFO) << "!!! write success: " << locate;
+    return str;
 }
+
+template <typename Target_Type>
+static void record_tensor_in_format(const Tensor<Target_Type>& tensor,
+                                    const std::string& op_type, const std::string& op_name, bool is_out, int index) {
+    std::string path = "record+" + op_type +
+                       "+" + op_name +
+                       "+" + (is_out ? "out" : "in") +
+                       "+" + std::to_string(index) + "+";
+
+    for (auto x : tensor.valid_shape()) {
+        path += std::to_string(x) + "_";
+    }
+
+    path = replace_all(path, "/", "_");
+    write_tensorfile(tensor, (path + ".txt").c_str());
+}
+
+template <typename Dtype>
+static std::string vector_2_string(std::vector<Dtype> vec) {
+    std::string ans = "[";
+
+    for (auto a : vec) {
+        ans += std::to_string(a) + ",";
+    }
+
+    ans += "]";
+    return ans;
+}
+
+template <typename Dtype>
+static void printf_intrin_var(Dtype data) {
+    std::string ans = "";
+
+    for (int i = 0; i < sizeof(data) / 4; i++) {
+        ans += std::to_string(data[i]) + ",";
+    }
+
+    LOG(INFO) << ans;
+}
+
+
+}
+}
+
 #endif
-
-#ifdef USE_X86_PLACE
-template<>
-void record_dev_tensorfile<X86>(const float* dev_tensor, int size, const char* locate) {
-    FILE* fp = fopen(locate, "w+");
-
-    if (fp == 0) {
-        LOG(ERROR) << "file open failed " << locate;
-
-    } else {
-        for (int i = 0; i < size; ++i) {
-            fprintf(fp, "[%d] %g \n", i, (dev_tensor[i]));
-        }
-
-        fclose(fp);
-    }
-
-    LOG(INFO) << "!!! write success: " << locate;
-}
-static void record_dev_tensorfile(Tensor <X86, AK_FLOAT, NCHW>* dev_tensor, const char* locate) {
-    int size=dev_tensor->valid_size();
-    FILE* fp = fopen(locate, "w+");
-
-    if (fp == 0) {
-        LOG(ERROR) << "file open failed " << locate;
-
-    } else {
-
-        for (int i = 0; i < size; ++i) {
-            fprintf(fp, "[%d] %g \n", i, (dev_tensor->data()[i]));
-        }
-
-        fclose(fp);
-    }
-
-        LOG(INFO) << "!!! write success: " << locate;
-}
-#endif
-
-#if defined(USE_X86_PLACE) || defined(USE_CUDA)
-static void readTensorData(Tensor<X86, AK_FLOAT, NCHW> tensor, const char* locate) {
-    typedef typename Tensor<X86, AK_FLOAT, NCHW>::Dtype Dtype;
-    FILE* fp = fopen(locate, "rb");
-
-    if (fp == 0) {
-        LOG(ERROR) << "file open failed " << locate;
-        exit(0);
-
-    } else {
-        LOG(INFO) << "file open success [" << locate << " ],read " << tensor.valid_shape().count();
-        size_t size=fread(tensor.mutable_data(), sizeof(Dtype), tensor.valid_size(), fp);
-        CHECK_EQ(size,tensor.valid_shape().count())<<"read data file ["<<locate<<"], size not match";
-        fclose(fp);
-    }
-}
-
-static void readTensorData(Tensor<X86, AK_FLOAT, NCHW_C16> tensor, const char* locate) {
-    typedef typename Tensor<X86, AK_FLOAT, NCHW>::Dtype Dtype;
-    FILE* fp = fopen(locate, "rb");
-
-    if (fp == 0) {
-                LOG(ERROR) << "file open failed " << locate;
-
-    } else {
-                LOG(INFO) << "file open success [" << locate << " ],read " << tensor.valid_shape().count();
-        size_t size=fread(tensor.mutable_data(), sizeof(Dtype), tensor.valid_size(), fp);
-        CHECK_EQ(size,tensor.valid_shape().count())<<"read data file ["<<locate<<"], size not match";
-        fclose(fp);
-    }
-}
-#endif
-}
-}
-
-
 
 #endif //ANAKIN_DEBUG_H

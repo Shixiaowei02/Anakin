@@ -163,6 +163,12 @@ public:
     /// check if the arc is aceessable for fusion 
     bool check_pass(std::string, std::string);
 
+    ///check if the the node is accessible to another
+    bool check_accessible(std::string, std::string);
+
+    ///make vgraph node index
+    std::map<std::pair<std::string, std::string>, int> connect_table();
+
     /// register the arc outs 
     void register_outs(std::string, std::string);
 
@@ -174,11 +180,26 @@ public:
 
 	std::vector<std::string>& get_exec_order() { return _nodes_exec_order; }
 
+    void add_fusion_edge_map(std::string new_e, std::string old_e){
+        _fusion_edge_map[new_e] = old_e;
+    }
+    std::string get_fusion_old_edge(
+        std::string new_e){
+        if (_fusion_edge_map.count(new_e) > 0){
+            return _fusion_edge_map[new_e];
+        } else {
+            //LOG(ERROR) << "fusion map has no key: " << new_e;
+            return "";
+        }
+    }
+
 private:
     ///< _registed_outs :outs that needs to be exported
     std::vector<std::pair<std::string, std::string>> _registed_outs;
 	///< node execute order
 	std::vector<std::string> _nodes_exec_order;
+    ///< origin edge map to new edge after fusion
+    std::unordered_map<std::string, std::string> _fusion_edge_map;
 };
 
 

@@ -1,25 +1,41 @@
+#include <fstream>
 #include "framework/lite/code_gen_cpp.h"
+#include "framework/core/net/calibrator_parse.h"
 
 namespace anakin {
 
 namespace lite {
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_license() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_license() {
 	_code<< "/* Copyright (c) 2018 Anakin Authors, Inc. All Rights Reserved.\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.\n*/\n\n";
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_header_start() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_header_start() {
 	_code.Clean();
 	gen_license();
 	_code.feed("#ifndef ANAKIN_%s_H \n", _code_name.c_str());
 	_code.feed("#define ANAKIN_%s_H \n\n", _code_name.c_str());
-	_code<<"#include <stdio.h>\n";
-	_code<<"#include <stdlib.h>\n";
-	_code<<"#include <string.h>\n\n";
     _code<<"#include <saber/lite/core/tensor_op_lite.h>\n";
 	_code<<"#include <saber/lite/core/common_lite.h>\n";
+    _code<<"#include <saber/lite/core/context_lite.h>\n";
+	_code<<"using namespace anakin;\n";
+	_code<<"using namespace anakin::saber;\n";
+	_code<<"using namespace anakin::saber::lite;\n\n";
+    _code<<"namespace anakin { \n\n";
+}
+
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_header_end() {
+	_code<<"} /* namespace anakin */\n";
+	_code<<"\n#endif\n";
+}
+
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_source_start() {
+	_code.Clean();
+	_code.feed("#include \"%s.h\" \n\n", _code_name.c_str());
     _code<<"#include <saber/lite/funcs/op_param.h>\n";
     _code<<"#include <saber/lite/funcs/op_base.h>\n";
     _code<<"#include <saber/lite/funcs/detection_lite.h>\n";
@@ -29,50 +45,32 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_header_start() {
     _code<<"#include <saber/lite/funcs/saber_eltwise.h>\n";
     _code<<"#include <saber/lite/funcs/saber_eltwise_act.h>\n";
     _code<<"#include <saber/lite/funcs/saber_permute.h>\n";
-    _code<<"#include <saber/lite/funcs/saber_prelu.h>\n";
     _code<<"#include <saber/lite/funcs/saber_power.h>\n";
     _code<<"#include <saber/lite/funcs/saber_priorbox.h>\n";
     _code<<"#include <saber/lite/funcs/saber_scale.h>\n";
     _code<<"#include <saber/lite/funcs/saber_slice.h>\n";
     _code<<"#include <saber/lite/funcs/timer_lite.h>\n";
     _code<<"#include <saber/lite/funcs/saber_conv.h>\n";
-    _code<<"#include <saber/lite/funcs/saber_conv_act.h>\n";
     _code<<"#include <saber/lite/funcs/saber_deconv.h>\n";
-    _code<<"#include <saber/lite/funcs/saber_deconv_act.h>\n";
-	_code<<"#include <saber/lite/funcs/saber_conv_act_pooling.h>\n";
+    _code<<"#include <saber/lite/funcs/saber_conv_pooling.h>\n";
     _code<<"#include <saber/lite/funcs/saber_fc.h>\n";
     _code<<"#include <saber/lite/funcs/saber_pooling.h>\n";
     _code<<"#include <saber/lite/funcs/saber_split.h>\n";
-	_code<<"#include <saber/lite/funcs/saber_flatten.h>\n";
-	_code<<"#include <saber/lite/funcs/saber_reshape.h>\n";
+    _code<<"#include <saber/lite/funcs/saber_flatten.h>\n";
+    _code<<"#include <saber/lite/funcs/saber_reshape.h>\n";
+    _code<<"#include <saber/lite/funcs/saber_shuffle_channel.h>\n";
     _code<<"#include <saber/lite/funcs/saber_softmax.h>\n\n";
-	_code<<"using namespace anakin;\n";
-	_code<<"using namespace anakin::saber;\n";
-	_code<<"using namespace anakin::saber::lite;\n\n";
-    _code<<"namespace anakin { \n\n";
-}	
-
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_header_end() {
-	_code<<"} /* namespace anakin */\n";
-	_code<<"\n#endif\n";
-}
-
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_source_start() {
-	_code.Clean();
-	_code.feed("#include \"%s.h\" \n\n", _code_name.c_str());
 	_code<<"namespace anakin { \n\n";
 	// add running impl for model api
-}	
+}
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_source_end() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_source_end() {
 	_code<<"} /* namespace anakin */\n";
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_tensors() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_tensors() {
 	_code<<"\n// generating tensors \n";
 	for(auto it = this->_tensor_map.begin(); it != this->_tensor_map.end(); ++it) {
 		auto& edge_name = it->first;
@@ -108,8 +106,8 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_tensors() {
 	}
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::tensors_init() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::tensors_init() {
 	_code<<"\n// initialize tensors \n";
 	_code.feed("void %s_tensors_init() {\n", _code_name.c_str());
 	for(auto it = this->_tensor_map.begin(); it != this->_tensor_map.end(); ++it) {
@@ -132,8 +130,8 @@ void GenCPP<Ttype, Dtype, Ptype>::tensors_init() {
 
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_model_ios() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_model_ios() {
 	_code<<"\n// generating model's I/O \n";
     _code.feed("std::vector<std::vector<Tensor<CPU, AK_FLOAT>*>> %s_tensor_ins;\n", _code_name.c_str());
     _code.feed("std::vector<std::vector<Tensor<CPU, AK_FLOAT>*>> %s_tensor_outs;\n", _code_name.c_str());
@@ -144,8 +142,8 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_model_ios() {
 //	}
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::model_ios_init() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::model_ios_init() {
 	_code<<"\n// initialize model's I/O \n";
     _code.feed("void %s_model_ios_init() {\n", _code_name.c_str());
     _code.feed("    %s_tensor_ins.resize(%d);\n", _code_name.c_str(), this->_exec_node_order.size());
@@ -167,12 +165,12 @@ void GenCPP<Ttype, Dtype, Ptype>::model_ios_init() {
             _code.feed("    %s_tensor_outs[i].push_back(&%s_%s);\n", _code_name.c_str(), _code_name.c_str(), edge_out.c_str());
         }
         _code.feed("    i++;\n");
-    }	
+    }
 	_code<<"}\n";
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_ops() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_ops() {
 	_code<<"\n// generating model's operations\n";
     _code<<"\n// create vector of ops\n";
     _code.feed("std::vector<OpBase*> %s_g_ops;\n", _code_name.c_str());
@@ -196,9 +194,9 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_ops() {
     _code << "}\n";
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_init_impl() {
-	_code<<"// initial function for model.\n"; 
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_init_impl() {
+	_code<<"// initial function for model.\n";
 	_code.feed("bool %s_init(Context& ctx) {\n", _code_name.c_str());
     _code.feed("    bool flag = false;\n");
     _code.feed("    for (int i = 0; i < %s_g_ops.size(); i++) {\n", _code_name.c_str());
@@ -229,8 +227,8 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_init_impl() {
 	_code << "}\n";
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_run_impl(const bool debug_mode) {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_run_impl(const bool debug_mode) {
 	_code << "// Running prediction for model. \n";
 	_code.feed("bool %s_prediction() {\n", _code_name.c_str());
     _code.feed("    bool flag = false;\n");
@@ -278,12 +276,12 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_run_impl(const bool debug_mode) {
 	_code << "}\n";
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_head_api() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_head_api() {
 	// gen gloss for graph ins
 	_code << "/// Model "<< _code_name << " have  " << this->_ins.size() << " inputs.\n";
 	for(auto in : this->_ins) {
-		auto& node_info = this->_graph_node_map[in]; 
+		auto& node_info = this->_graph_node_map[in];
 		auto& edge_info = this->_tensor_map[node_info.outs[0]];
 		_code << "///  |-- input name : " << in << "  -- Shape(";
 		std::string shape_str;
@@ -303,13 +301,13 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_head_api() {
 	// gen gloss for graph outs
 	_code << "/// Model " << _code_name << " have  " << this->_outs.size() << " outputs.\n";
 	for(auto out : this->_outs) {
-		auto& node_info = this->_graph_node_map[out]; 
+		auto& node_info = this->_graph_node_map[out];
 		auto& edge_info = this->_tensor_map[node_info.ins[0]];
 		_code << "///  |-- output name : " << out << "  -- Shape(";
 		for(int i=0; i<edge_info.valid_shape.size() - 1; i++) {
 			_code << edge_info.valid_shape[i] << ",";
 		}
-		if(edge_info.valid_shape.size() > 0) { 
+		if(edge_info.valid_shape.size() > 0) {
 			_code << edge_info.valid_shape[edge_info.valid_shape.size() - 1] << ")\n";
 		} else {
 			_code << ")\n";
@@ -339,8 +337,8 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_head_api() {
 
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_head_api_impl() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_head_api_impl() {
 	// gen api for getting graph input tensor
 	_code << "\n// gen api for getting graph input tensor \n";
 	_code.feed("std::vector<Tensor<CPU, AK_FLOAT>*> %s_get_in() {\n", _code_name.c_str());
@@ -423,7 +421,7 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_head_api_impl() {
     _code.feed("        %s_g_param[i] = nullptr;\n", _code_name.c_str());
     _code.feed("    }\n");
     _code.feed("    %s_g_param.clear();\n", _code_name.c_str());
-    _code.feed("    const float* weights_ptr = (const float*)weights;\n");
+    _code.feed("    const char* weights_ptr = (const char*)weights;\n");
     std::string local_weight_string = "weights_ptr";
 
 	for(auto & node_name : this->_exec_node_order) {
@@ -434,12 +432,16 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_head_api_impl() {
 		auto& node_info = this->_graph_node_map[node_name];
 		auto& attr_info = this->_graph[node_name]->attr();
 		if(OPERATION_MAP.count(node_info.op_name) > 0) {
+			LOG(INFO) << "node name: " << node_name;
 			LOG(INFO) << "Target op type : " << this->_graph_node_map[node_name].op_name << " parsing ...";
 			auto str = OPERATION_MAP[node_info.op_name].parse(attr_info, _code_name,
                                                               OPERATION_MAP[node_info.op_name].OpClassName,
-															  node_name, 
+															  node_name,
 															  local_weight_string,
-															  _weights, false);
+															  _weights,
+                                                              false,
+                                                              _lite_mode,
+                                                              this->_graph[node_name]->bit_type());
 			if(!str.empty()) {
 				_code.feed("    %s", str.c_str());
 			}
@@ -481,23 +483,23 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_head_api_impl() {
 	_code <<"}\n\n";
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_header() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_header() {
 	_code.Clean();
 	_code.open(_h_file_name);
 	gen_header_start();
 	// gen api
 	gen_head_api();
 	gen_header_end();
-	_code.save();	
+	_code.save();
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_source(const bool debug_mode) {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_source(const bool debug_mode) {
 	_code.Clean();
 	_code.open(_cpp_file_name);
-	gen_source_start(); 
-	// generate tensors 
+	gen_source_start();
+	// generate tensors
 	gen_tensors();
 	// tensors init
 	tensors_init();
@@ -521,8 +523,86 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_source(const bool debug_mode) {
     }
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_opt_model() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_opt_model() {
+
+	//parse config file
+	bool flag_precision = false;
+	bool flag_calibrator = false;
+	bool flag_lite_mode = _lite_mode;
+	CalibratorParser parser;
+	if (_precision_path == ""){
+		flag_precision = false;
+	}else {
+		parser.parse_from_file(_precision_path, "");
+		flag_precision = true;
+	}
+
+	if (_calibrator_path == ""){
+		flag_calibrator = false;
+	}else {
+		parser.parse_from_file("", _calibrator_path);
+		flag_calibrator = true;
+	}
+
+	auto get_op_precision = [&](NodeInfo& node_info)->std::string{
+		if (flag_precision){
+			return parser.get_precision(node_info.name);
+		} else {
+			auto dtype = node_info.dtype;
+			if (dtype == AK_FLOAT){
+				return "fp32";
+			} else if (dtype == AK_INT8){
+				return "int8";
+			} else {
+				//LOG(FATAL) << "unsupport precision type";
+                node_info.dtype = AK_FLOAT;
+				return "fp32";
+			}
+		}
+	};
+	auto get_tensor_precision = [&](EdgeInfo& edge_info)->std::string{
+		if (flag_precision){
+			auto dtype = parser.get_dtype(edge_info.in_node, edge_info.out_node);
+			if (dtype == AK_FLOAT){
+				return "fp32";
+			} else if (dtype == AK_INT8) {
+				return "int8";
+			} else {
+				//LOG(FATAL) << "unsupport precision type";
+				return "fp32";
+			}
+		} else {
+			auto dtype = edge_info.dtype;
+			if (dtype == AK_FLOAT){
+				return "fp32";
+			} else if (dtype == AK_INT8) {
+				return "int8";
+			} else {
+				//LOG(FATAL) << "unsupport precision type";
+                edge_info.dtype = AK_FLOAT;
+				return "fp32";
+			}
+		}
+	};
+
+	auto get_tensor_calibrator = [&](EdgeInfo& edge_info)->float{
+		if (flag_calibrator){
+			auto calibrator_scale = parser.get_calibrator(edge_info.name);
+			return calibrator_scale;
+		} else {
+			std::vector<float> calibrator_scale = edge_info.scale;
+			if (calibrator_scale.size() == 0){
+				return 1.f;
+			} else {
+				return calibrator_scale[0];
+			}
+		}
+	};
+
+	//!generate Version Number
+	int version_num = MAJOR * 100 + MINOR * 10 + REVISION;
+	_opt_param_write << "Version: " << version_num << "\n";
     //! generate Tensors
     LOG(INFO) << "gen opt model tensors";
     _opt_param_write << "Tensor_number " << this->_tensor_map.size() << "\n";
@@ -531,12 +611,20 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_opt_model() {
         auto& edge_name = it->first;
         auto& edge_info = it->second;
         if(! edge_info.is_shared) {
-            //tensor info format: tensor_name valid_shape real_shape is_shared shared_tensor_name
+            //tensor info format: tensor_name tensor_precision valid_shape real_shape is_shared shared_tensor_name
             _opt_param_write << edge_name << " ";
+            //tensor precision info
+            auto t_precision = get_tensor_precision(edge_info);
+            _opt_param_write << t_precision << " ";
+ 			//tensor calibrator info
+ 			auto t_calibrator = get_tensor_calibrator(edge_info);
+ 			_opt_param_write << t_calibrator << " ";
+            //tensor valid shape
             _opt_param_write << edge_info.valid_shape.size() << " ";
             for (int i = 0; i < edge_info.valid_shape.size(); ++i) {
                 _opt_param_write << edge_info.valid_shape[i] << " ";
             }
+            //tensor shape
             _opt_param_write << edge_info.real_shape.size() << " ";
             for (int i = 0; i < edge_info.real_shape.size(); ++i) {
                 _opt_param_write << edge_info.real_shape[i] << " ";
@@ -552,10 +640,19 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_opt_model() {
             //tensor info format: tensor_name valid_shape real_shape is_shared shared_tensor_name
 
             _opt_param_write << edge_name << " ";
+
+            //tensor precision info
+            auto t_precision = get_tensor_precision(edge_info);
+            _opt_param_write << t_precision << " ";
+            //tensor calibrator info
+ 			auto t_calibrator = get_tensor_calibrator(edge_info);
+ 			_opt_param_write << t_calibrator << " ";
+            //tensor valid shape
             _opt_param_write << edge_info.valid_shape.size() << " ";
             for (int i = 0; i < edge_info.valid_shape.size(); ++i) {
                 _opt_param_write << edge_info.valid_shape[i] << " ";
             }
+            //tensor shape
             _opt_param_write << edge_info.valid_shape.size() << " ";
             for (int i = 0; i < edge_info.valid_shape.size(); ++i) {
                 _opt_param_write << edge_info.valid_shape[i] << " ";
@@ -563,21 +660,23 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_opt_model() {
             _opt_param_write << 1 << " " << edge_info.share_from << "\n";
         }
     }
-    //! gen inputs and outputs tensor name
+    //! gen inputs and outputs tensor name and precision
     _opt_param_write << "inputs " << this->_ins.size();
     for(auto in : this->_ins) {
         auto node_info = this->_graph_node_map[in];
         auto edge_info = this->_tensor_map[node_info.outs[0]];
         _opt_param_write << " " << edge_info.name;
+        _opt_param_write << " " << "fp32";
     }
     _opt_param_write << "\n";
 
-    //! gen outputs and outputs tensor name
+    //! gen outputs and outputs tensor name and precision
     _opt_param_write << "outputs " << this->_outs.size();
     for(auto out : this->_outs) {
         auto node_info = this->_graph_node_map[out];
         auto edge_info = this->_tensor_map[node_info.ins[0]];
         _opt_param_write << " " << edge_info.name;
+        _opt_param_write << " " << "fp32";
     }
     _opt_param_write << "\n";
 
@@ -596,16 +695,26 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_opt_model() {
         }
         auto& node_info = this->_graph_node_map[node_name];
         auto& attr_info = this->_graph[node_name]->attr();
-        if(OPERATION_MAP.count(node_info.op_name) > 0) {
+        if (OPERATION_MAP.count(node_info.op_name) > 0) {
+            LOG(INFO) << "node name: " << node_name;
             LOG(INFO) << "Target op type : " << this->_graph_node_map[node_name].op_name << " parsing ...";
             _opt_param_write << OPERATION_MAP[node_info.op_name].OpClassName << " " << node_name << " ";
+        	_opt_param_write << get_op_precision(node_info) << " ";
             _opt_param_write << node_info.ins.size() << " ";
             _opt_param_write << node_info.outs.size() << " ";
             for(auto &edge_in : node_info.ins) {
                 _opt_param_write << edge_in << " ";
+                // auto edge_in_name = this->_tensor_map[edge_in].in_node;
+                // auto edge_out_name = this->_tensor_map[edge_in].out_node;
+                // auto t_precision = get_tensor_precision(edge_in_name, edge_out_name);
+                // _opt_param_write << t_precision << " ";
             }
             for(auto &edge_out : node_info.outs) {
                 _opt_param_write << edge_out.c_str() << " ";
+                // auto edge_in_name = this->_tensor_map[edge_out].in_node;
+                // auto edge_out_name = this->_tensor_map[edge_out].out_node;
+                // auto t_precision = get_tensor_precision(edge_in_name, edge_out_name);
+                // _opt_param_write << t_precision << " ";
             }
             std::string local_weighs_string = "null";
             auto str = OPERATION_MAP[node_info.op_name].parse(attr_info, _code_name,
@@ -613,7 +722,9 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_opt_model() {
                                                               node_name,
                                                               local_weighs_string,
                                                               _opt_weights,
-                                                              true);
+                                                              true,
+                                                              flag_lite_mode,
+                                                              node_info.dtype);
             _opt_param_write << str;
         } else {
             LOG(FATAL) << "Target op type : " << this->_graph_node_map[node_name].op_name << " not support";
@@ -623,8 +734,8 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_opt_model() {
     _opt_param_write.save();
 }
 
-template<typename Ttype, DataType Dtype, Precision Ptype>
-void GenCPP<Ttype, Dtype, Ptype>::gen_merge_model() {
+template<typename Ttype, Precision Ptype>
+void GenCPP<Ttype, Ptype>::gen_merge_model() {
     FILE* fp_merge = fopen(_merge_opt_file.c_str(), "wb");
     FILE* fp_weight = fopen(_model_file_name.c_str(), "rb");
     FILE* fp_info = fopen(_model_opt_file_name.c_str(), "rb");
@@ -656,24 +767,24 @@ void GenCPP<Ttype, Dtype, Ptype>::gen_merge_model() {
 }
 
 #ifdef USE_CUDA
-template class GenCPP<NV, AK_FLOAT, Precision::FP32>;
-template class GenCPP<NV, AK_FLOAT, Precision::FP16>;
-template class GenCPP<NV, AK_FLOAT, Precision::INT8>;
+template class GenCPP<NV, Precision::FP32>;
+template class GenCPP<NV, Precision::FP16>;
+template class GenCPP<NV, Precision::INT8>;
 #endif
 
 #ifdef USE_X86_PLACE
-template class GenCPP<X86, AK_FLOAT, Precision::FP32>;
-template class GenCPP<X86, AK_FLOAT, Precision::FP16>;
-template class GenCPP<X86, AK_FLOAT, Precision::INT8>;
+template class GenCPP<X86, Precision::FP32>;
+template class GenCPP<X86, Precision::FP16>;
+template class GenCPP<X86, Precision::INT8>;
 #endif
 
 #ifdef USE_ARM_PLACE
-template class GenCPP<ARM, AK_FLOAT, Precision::FP32>;
-template class GenCPP<ARM, AK_FLOAT, Precision::FP16>;
-template class GenCPP<ARM, AK_FLOAT, Precision::INT8>;
+template class GenCPP<ARM, Precision::FP32>;
+template class GenCPP<ARM, Precision::FP16>;
+template class GenCPP<ARM, Precision::INT8>;
 #endif
 
-template class GenCPP<X86, AK_FLOAT, Precision::FP32>;
+template class GenCPP<X86, Precision::FP32>;
 
 } /* namespace lite */
 
