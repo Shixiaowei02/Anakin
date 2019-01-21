@@ -37,7 +37,11 @@ public:
     typedef typename DataTrait<AMD, OpDtype>::Dtype OpDataType;
     typedef AMD_API::TPtr PtrDtype;
 
-    SaberPixelShuffle() {}
+    SaberPixelShuffle() {
+        _old_steps.re_alloc(Shape({1, 1, 1, 6}), AK_INT32);
+        _new_steps.re_alloc(Shape({1, 1, 1, 6}), AK_INT32);
+        _permute_order.re_alloc(Shape({1, 1, 1, 6}), AK_INT32);
+    }
 
     ~SaberPixelShuffle() {}
 
