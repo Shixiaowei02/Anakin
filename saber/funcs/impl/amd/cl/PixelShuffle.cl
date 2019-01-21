@@ -16,26 +16,41 @@
  */
 
 __kernel void ker_permute_fwd(
-    global float* out_data,
+    global float* top_data,
     const int num_axes,
     const int count,
     global const int* permute_order,
     global const int* new_steps,
     global const int* old_steps,
-    global const float* in_data) {
-    int global_idx = get_global_id(0);
-    int org_idx    = global_idx;
-    int in_idx     = 0;
+    global const float* bottom_data) {
 
-    if (global_idx < count) {
-        for (int i = 0; i < num_axes; i++) {
-            int order    = permute_order[i];
-            int new_step = new_steps[i];
-            int old_step = old_steps[order];
-            in_idx += (org_idx / new_step) * old_step;
-            org_idx %= new_step;
+    int index = get_global_id(0);
+
+    if (index < count) {
+        int temp_idx = index;
+        int old_idx = 0;
+
+        printf("[index] %d\n", index);
+
+        for (int i = 0; i < num_axes; ++i) {
+            int order = permute_order[i];
+            old_idx += (temp_idx / new_steps[i]) * old_steps[order];
+            temp_idx %= new_steps[i];
         }
-        out_data[global_idx] = in_data[in_idx];
+        if (index != old_idx) {
+            printf("\n=====");
+            printf("old_idx: %d", old_idx);
+            printf("index: %d", index);
+            printf("=====\n");
+
+            top_data[index] = -1;
+        }
+        else {
+            top_data[index] = bottom_data[old_idx];
+        }
+
+        //top_data[index] = bottom_data[index];
     }
 }
+
 

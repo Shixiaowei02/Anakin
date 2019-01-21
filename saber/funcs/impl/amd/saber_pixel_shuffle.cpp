@@ -47,6 +47,36 @@ SaberPixelShuffle<AMD, OpDtype>::CreateKernelList(int device_id, KernelInfo& ker
 }
 
 template <DataType OpDtype>
+SaberStatus SaberPixelShuffle<AMD, OpDtype>::update_steps(
+    const std::vector<Tensor<AMD>*>& inputs,
+    std::vector<Tensor<AMD>*>& outputs,
+    PixelShuffleParam<AMD>& param,
+    std::vector<int>& old_steps,
+    std::vector<int>& new_steps) {
+
+    const int num     = inputs[0]->num();
+    const int channel = inputs[0]->channel();
+    const int height  = inputs[0]->height();
+    const int width   = inputs[0]->width();
+    const int factor  = param.upscale_factor;
+    CHECK_NE(factor, 0) << "factor should not be zero.";
+    CHECK_EQ(channel % (factor * factor), 0) << "remainder should be zero.";
+    const int out_channel = channel / (factor * factor);
+    const std::vector<int> old_shape({num, out_channel, factor, factor, height, width});
+    const std::vector<int> new_shape({num, out_channel, height, factor, width, factor});
+    for (int i = 0, old_step = 1, new_step = 1; i < 6; i++) {
+        LOG(INFO) << "old_shape " << "i: " << old_shape[i];
+        LOG(INFO) << "new_shape " << "i: " << new_shape[i];
+        old_step *= old_shape[i];
+        new_step *= new_shape[i];
+        old_steps.push_back(old_step);
+        new_steps.push_back(new_step);
+    }
+    return SaberSuccess;
+
+}
+
+template <DataType OpDtype>
 SaberStatus SaberPixelShuffle<AMD, OpDtype>::load_clkernel(
     const std::vector<Tensor<AMD>*>& inputs,
     std::vector<Tensor<AMD>*>& outputs,
@@ -84,25 +114,16 @@ SaberStatus SaberPixelShuffle<AMD, OpDtype>::create(
 
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
-    const int num     = inputs[0]->num();
-    const int channel = inputs[0]->channel();
-    const int height  = inputs[0]->height();
-    const int width   = inputs[0]->width();
-
-    const int factor      = param.upscale_factor;
-    const int out_channel = channel / (factor * factor);
-    const int count       = inputs[0]->valid_shape().count();
-
-    const Shape old_shape({num, out_channel, factor, factor, height, width});
-    const Shape new_shape({num, out_channel, height, factor, width, factor});
-
     std::vector<int> old_steps;
     std::vector<int> new_steps;
-    std::vector<int> permute_order({0, 1, 4, 2, 5, 3});
+    std::vector<int> permute_order({0, 1, 2, 3, 4, 5});
+    this->update_steps(inputs, outputs, param, old_steps, new_steps);
 
-    for (int i = 0; i < 6; i++) {
-        old_steps.push_back(old_shape.count(i + 1));
-        new_steps.push_back(new_shape.count(i + 1));
+    for (int step: old_steps) {
+        LOG(INFO) << "cl old step: " << step;
+    }
+    for (int step: new_steps) {
+        LOG(INFO) << "cl new step: " << step;
     }
 
     cl_mem old_steps_p     = (cl_mem)_old_steps.mutable_data();
@@ -132,6 +153,8 @@ SaberStatus SaberPixelShuffle<AMD, OpDtype>::dispatch(
     std::vector<Tensor<AMD>*>& outputs,
     PixelShuffleParam<AMD>& param) {
 
+    DLOG(INFO) << "dispatch PixelShuffle! ";
+
     AMD_API::stream_t cm = this->_ctx->get_compute_stream();
 
     bool err                     = false;
@@ -143,7 +166,6 @@ SaberStatus SaberPixelShuffle<AMD, OpDtype>::dispatch(
     OpDataType* top_data         = (OpDataType*)outputs[0]->mutable_data();
     OpDataType* bottom_data      = (OpDataType*)inputs[0]->data();
 
-    int img_size                 = outputs[0]->height() * outputs[0]->width();
     amd_kernel_list::iterator it = _kernels.begin();
 
     err = it->get()->SetKernelArgs(
@@ -167,6 +189,5 @@ SaberStatus SaberPixelShuffle<AMD, OpDtype>::dispatch(
 
     return SaberSuccess;
 }
-
 }
 }

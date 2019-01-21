@@ -16,7 +16,11 @@
 
 #include "saber/funcs/base.h"
 #include "saber/funcs/impl/impl_base.h"
+#include "saber/funcs/impl/impl_pixel_shuffle.h"
 
+#ifdef AMD_GPU
+#include "saber/funcs/impl/amd/include/saber_pixel_shuffle.h"
+#endif
 
 namespace anakin {
 
@@ -47,7 +51,7 @@ public:
     typedef std::vector<Shape> Shape_v;
 
     virtual SaberStatus compute_output_shape(const Input_v& inputs, Output_v& outputs, \
-            Param_t& Param) override {
+            Param_t& param) override {
 
         CHECK_EQ(inputs.size(), 1) << "The size of input vector is incorrect.";
 
@@ -62,12 +66,12 @@ public:
 
     virtual SaberStatus init_impl(ImplEnum implenum) override {
         switch (implenum) {
-        case VENDER_IMPL:
-            this->_impl.push_back(new SaberPixelShuffle<TargetType, OpDtype>);
-            return SaberSuccess;
+            case SABER_IMPL:
+                this->_impl.push_back(new SaberPixelShuffle <TargetType, OpDtype>);
+                return SaberSuccess;
+            default:
+                return SaberUnImplError;
         }
-        default:
-            return SaberUnImplError;
     }
 
 private:

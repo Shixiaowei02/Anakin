@@ -33,8 +33,8 @@ public:
 
     Shape(vector data, LayoutType layout_type = Layout_NCHW) {
         create_layout(layout_type);
-        CHECK_EQ(_layout->dims(), data.size()) \
-                << "The shape from the vector must have the correct layout.";
+        //CHECK_EQ(_layout->dims(), data.size()) \
+        //        << "The shape from the vector must have the correct layout.";
 
         for (int i = 0; i < _layout->dims(); ++i) {
             this->push_back(data[i]);

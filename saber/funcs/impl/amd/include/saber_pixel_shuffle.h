@@ -59,12 +59,15 @@ public:
             PixelShuffleParam<AMD>& param) override;
 
 private:
-    CreateKernelList(int device_id, KernelInfo& kernelInfo);
     amd_kernel_list _kernels;
-
-    Tensor<AMD> _old_steps(AK_INT32);
-    Tensor<AMD> _new_steps(AK_INT32);
-    Tensor<AMD> _permute_order(AK_INT32);
+    Tensor<AMD> _old_steps;
+    Tensor<AMD> _new_steps;
+    Tensor<AMD> _permute_order;
+    CreateKernelList(int device_id, KernelInfo& kernelInfo);
+    SaberStatus load_clkernel(const std::vector<Tensor<AMD>*>& inputs, std::vector<Tensor<AMD>*>& outputs,
+                  PixelShuffleParam<AMD>& param, Context<AMD>& ctx);
+    SaberStatus update_steps(const std::vector<Tensor<AMD>*>& inputs, std::vector<Tensor<AMD>*>& outputs,
+                  PixelShuffleParam<AMD>& param, std::vector<int>& old_steps, std::vector<int>& new_steps);
 };
 
 template class SaberPixelShuffle<AMD, AK_FLOAT>;
