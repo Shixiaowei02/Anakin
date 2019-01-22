@@ -21,6 +21,9 @@
 #ifdef NVIDIA_GPU
 #include "saber/funcs/impl/cuda/saber_shuffle_channel.h"
 #endif
+#ifdef AMD_GPU
+#include "saber/funcs/impl/amd/include/saber_shuffle_channel.h"
+#endif
 
 namespace anakin {
 
