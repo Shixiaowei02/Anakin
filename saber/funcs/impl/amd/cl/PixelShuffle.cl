@@ -30,27 +30,15 @@ __kernel void ker_permute_fwd(
         int temp_idx = index;
         int old_idx = 0;
 
-        printf("[index] %d\n", index);
-
         for (int i = 0; i < num_axes; ++i) {
             int order = permute_order[i];
             old_idx += (temp_idx / new_steps[i]) * old_steps[order];
             temp_idx %= new_steps[i];
         }
-        if (index != old_idx) {
-            printf("\n=====");
-            printf("old_idx: %d", old_idx);
-            printf("index: %d", index);
-            printf("=====\n");
 
-            top_data[index] = -1;
-        }
-        else {
-            top_data[index] = bottom_data[old_idx];
-        }
-
-        //top_data[index] = bottom_data[index];
+        top_data[index] = bottom_data[old_idx];
     }
 }
+
 
 
