@@ -118,17 +118,6 @@ SaberStatus SaberPixelShuffle<AMD, OpDtype>::create(
     cl_mem permute_order_p = (cl_mem)_permute_order.mutable_data();
 
     if (inputs[0]->is_continue_mem() && outputs[0]->is_continue_mem()) {
-        /*
-        AMD_API::async_memcpy(old_steps_p, 0, (int)inputs[0]->device_id(),
-            (void*) & old_steps[0], 0, (int)inputs[0]->device_id(),
-            sizeof(int) * 6, cm, __HtoD());
-        AMD_API::async_memcpy(new_steps_p, 0, (int)inputs[0]->device_id(),
-            (void*) & new_steps[0], 0, (int)inputs[0]->device_id(),
-            sizeof(int) * 6, cm, __HtoD());
-        AMD_API::async_memcpy(permute_order_p, 0, (int)inputs[0]->device_id(),
-            (void*) & permute_order[0], 0, (int)inputs[0]->device_id(),
-            sizeof(int) * 6, cm, __HtoD());
-            */
         AMD_API::sync_memcpy(old_steps_p, 0, (int)inputs[0]->device_id(),
             (void*) & old_steps[0], 0, (int)inputs[0]->device_id(),
             sizeof(int) * 6, __HtoD());
