@@ -124,12 +124,12 @@ void Device<AMD>::get_info() {
 
     cl_ulong* g_size;
     get_param(id, CL_DEVICE_GLOBAL_MEM_SIZE, &g_size);
-    _info._max_memory = (int)(*g_size / 1048576);
+    _info._max_memory = (int)(*g_size);
     free(g_size);
 
     cl_ulong* l_size;
     get_param(id, CL_DEVICE_LOCAL_MEM_SIZE, &l_size);
-    _info._sharemem_size = (int)(*g_size / 1048576);
+    _info._sharemem_size = (int)(*g_size);
     free(l_size);
 
 
@@ -137,8 +137,8 @@ void Device<AMD>::get_info() {
     LOG(INFO) << "Multiprocessors: " << _info._compute_core_num;
     LOG(INFO) << "frequency:" << _info._max_frequence << " MHz";
     LOG(INFO) << "AMD OpenCL Capability : " << _info._generate_arch;
-    LOG(INFO) << "total global memory: " << _info._max_memory << " MBytes.";
-    LOG(INFO) << "total local memory: " << _info._sharemem_size << " MBytes.";
+    LOG(INFO) << "total global memory: " << _info._max_memory / 1024 / 1024 << " MBytes.";
+    LOG(INFO) << "total local memory: " << _info._sharemem_size / 1024 << " KBytes.";
 };
 
 typename AMD_API::stream_t Device<AMD>::get_available_stream(typename AMD_API::stream_t stream) {
