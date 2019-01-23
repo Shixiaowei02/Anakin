@@ -29,7 +29,7 @@
 #endif
 
 #ifdef AMD_GPU 
-//#include "saber/funcs/impl/amd/saber_soft_sign.h"
+#include "saber/funcs/impl/amd/include/saber_soft_sign.h"
 #endif
 
 #ifdef USE_ARM_PLACE
