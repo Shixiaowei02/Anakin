@@ -29,7 +29,7 @@
 #endif
 
 #ifdef AMD_GPU 
-//#include "saber/funcs/impl/amd/saber_cos_sim.h"
+#include "saber/funcs/impl/amd/include/saber_cos_sim.h"
 #endif
 
 #ifdef USE_ARM_PLACE
