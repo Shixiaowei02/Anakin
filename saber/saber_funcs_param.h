@@ -2990,6 +2990,43 @@ struct ProductQuantEmbeddingWithVsumParam {
     
 };
 
+template <typename TargetType>
+struct DataNormParam {
+    DataNormParam() = default;
+    DataNormParam(float epsilon_in, 
+                  Tensor<TargetType>* batch_sum_in,
+                  Tensor<TargetType>* batch_size_in,
+                  Tensor<TargetType>* batch_square_sum_in):
+                  epsilon(epsilon_in),
+                  batch_sum(batch_sum_in),
+                  batch_size(batch_size_in),
+                  batch_square_sum(batch_square_sum_in){}
+
+    DataNormParam(const DataNormParam& right) {
+        epsilon = right.epsilon;
+        batch_sum = right.batch_sum;
+        batch_size = right.batch_size;
+        batch_square_sum = right.batch_square_sum;
+    }
+    DataNormParam& operator=(const DataNormParam& right) {
+        epsilon = right.epsilon;
+        batch_sum = right.batch_sum;
+        batch_size = right.batch_size;
+        batch_square_sum = right.batch_square_sum;
+        return *this;
+    }
+    bool operator==(const DataNormParam& right) {
+        bool flag = this->epsilon == right.epsilon;
+        flag = flag && (this->batch_sum == right.batch_sum);
+        flag = flag && (this->batch_size == right.batch_size);
+        return flag && (this->batch_square_sum == right.batch_square_sum);
+    }
+    float epsilon;
+    Tensor<TargetType>* batch_sum{nullptr};
+    Tensor<TargetType>* batch_size{nullptr};
+    Tensor<TargetType>* batch_square_sum{nullptr};
+};
+
 }
 
 }
