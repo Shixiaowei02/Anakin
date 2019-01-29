@@ -62,9 +62,6 @@ SaberStatus SaberSequencePool<AMD, OpDtype>::create(
     kernelInfo.kernel_file = "SequencePool.cl";
     kernelInfo.wk_dim      = 1;
     kernelInfo.kernel_type = SABER;
-    std::vector<size_t> l_wk({256});
-    std::vector<size_t> g_wk({256});
-
     kernel_direct_map = {
         {Sequence_pool_unknow,  "seq_pool_unknow"},
         {Sequence_pool_average, "seq_pool_average_kernel"},
