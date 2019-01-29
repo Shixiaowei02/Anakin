@@ -73,8 +73,8 @@ public:
 
         CHECK_EQ(input.size(), 1) << "Input of DataNorm should be 1.";
         if (input[0]->get_layout() == Layout_NCHW) {
-            CHECK_EQ(input[0]->height(), 1) << "Shape of DataNorm Input should be (N, C, 1, 1).";
-            CHECK_EQ(input[0]->width(), 1) << "Shape of DataNorm Input should be (N, C, 1, 1).";
+            CHECK_LE(input[0]->height(), 1) << "Shape of DataNorm Input should be (N, C, 1, 1).";
+            CHECK_LE(input[0]->width(), 1) << "Shape of DataNorm Input should be (N, C, 1, 1).";
         } else if (input[0]->get_layout() != Layout_NC) {
             LOG(FATAL) << "The layout of input is incorrect.";
         };
