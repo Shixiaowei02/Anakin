@@ -47,7 +47,7 @@ public:
     }
 
     bool isInit() {
-        return _kernel == NULL ? false : true;
+        return _kernel == nullptr ? false : true;
     }
 
     cl_program getProgram() {
@@ -111,6 +111,21 @@ public:
     }
 
     std::string GetName();
+
+    bool SetLocalWorkSize(const std::vector<size_t>& l_wk) {
+        kernel_info.l_wk = l_wk;
+        return true;
+    }
+
+    bool SetGlobalWorkSize(const std::vector<size_t>& g_wk) {
+        kernel_info.g_wk = g_wk;
+        return true;
+    }
+
+    bool SetGlobalWorkSizeOffset(const std::vector<size_t>& g_wk_offset) {
+        kernel_info.g_wk_offset = g_wk_offset;
+        return true;
+    }
 
     ~OCLKernel() {}
 

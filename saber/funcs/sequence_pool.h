@@ -29,6 +29,10 @@
 #include "saber/funcs/impl/x86/saber_sequence_pool.h"
 #endif
 
+#ifdef AMD_GPU
+#include "saber/funcs/impl/amd/include/saber_sequence_pool.h"
+#endif
+
 namespace anakin {
 namespace saber {
 
