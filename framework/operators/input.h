@@ -82,6 +82,7 @@ public:
 private:
     ///<  input_shape :input op may hold motl-input
     PTuple<int> input_shape;
+    LayoutType layout;
     int max_len{0};
     int max_batch{0};
 };

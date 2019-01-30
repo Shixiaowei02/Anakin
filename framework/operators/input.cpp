@@ -1,4 +1,5 @@
 #include "framework/operators/input.h"
+#include "framework/utils/layout_common.h"
 
 namespace anakin {
 
@@ -21,7 +22,10 @@ Status InputHelper<Ttype, Ptype>::InitParam() {
     if (CHECK_PARAMETER(max_batch)) {
         max_batch = GET_PARAMETER(int , max_batch);
     }
-
+    if (CHECK_PARAMETER(layout)) {
+        auto layout_str = GET_PARAMETER(std::string, layout);
+        layout = layout_from_string(layout_str);
+    }
     for (int i = 0; i < input_shape.size(); i++) {
         LOG(INFO) << " |-- shape [" << i << "]: " << input_shape[i];
     }
@@ -43,8 +47,9 @@ Status InputHelper<Ttype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Ttype
     for (int i = 0; i < input_shape.size(); i++) {
         out_shape.push_back(input_shape[i]);
     }
+    out_shape.set_layout(layout);
     for (auto& tensor_p : outs) {
-        tensor_p->set_shape_without_layout(out_shape);
+        tensor_p->set_shape(out_shape);
     }
     if (max_len != 0 && max_batch != 0) {
         std::vector<std::vector<int>> seq_offset(1, std::vector<int>(max_batch + 1, 0));
@@ -57,7 +62,6 @@ Status InputHelper<Ttype, Ptype>::InferShape(const std::vector<Tensor4dPtr<Ttype
             tensor_p->set_seq_offset(seq_offset);
         }
     }
-    
     return Status::OK();
 }
 
@@ -105,5 +109,3 @@ ANAKIN_REGISTER_OP(Input)
 } /* namespace ops */
 
 } /* namespace anakin */
-
-
