@@ -80,6 +80,8 @@ public:
         //! compute output shape
         for (int i = 1; i < input_size; ++i) {
             Shape sh = shapes_in[i];
+            CHECK_EQ(sh.get_layout(), shape_out.get_layout()) << \
+                "All inputs must have the same layout.";
             for (int j = 0; j < sh.dims(); ++j) {
                 if (j == param.axis) { continue; }
                 else if (sh[j] != -1) {
@@ -93,7 +95,7 @@ public:
             shape_out[param.axis] += sh[param.axis];
         }
         output[0]->set_seq_offset(input[0]->get_seq_offset());
-        return output[0]->set_shape_without_layout(shape_out);
+        return output[0]->set_shape(shape_out);
     }
 
     virtual SaberStatus init_impl(ImplEnum implenum) override {
