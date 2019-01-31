@@ -3027,6 +3027,40 @@ struct DataNormParam {
     Tensor<TargetType>* batch_square_sum{nullptr};
 };
 
+template <typename TargetType>
+struct SequencePoolConcatParam{
+    SequencePoolConcatParam()
+            : sequence_pool_param()
+            , concat_param()
+    {}
+    SequencePoolConcatParam(SequencePoolParam<TargetType> sequence_pool_param_in,
+            ConcatParam<TargetType> concat_param)
+        : sequence_pool_param(sequence_pool_param_in)
+        , concat_param(concat_param)
+    {}
+
+    SequencePoolConcatParam(const SequencePoolConcatParam& right)
+            : sequence_pool_param(right.sequence_pool_param)
+            , concat_param(right.concat_param)
+    {}
+
+    SequencePoolConcatParam& operator=(const SequencePoolConcatParam& right) {
+        sequence_pool_param = right.sequence_pool_param;
+        concat_param = right.concat_param;
+        return *this;
+    }
+
+    bool operator==(const SequencePoolConcatParam& right) {
+        bool comp_eq = true;
+        comp_eq &= (sequence_pool_param == right.sequence_pool_param);
+        comp_eq &= (concat_param == right.concat_param);
+        return comp_eq;
+    }
+
+    SequencePoolParam<TargetType> sequence_pool_param;
+    ConcatParam<TargetType> concat_param;
+};
+
 }
 
 }

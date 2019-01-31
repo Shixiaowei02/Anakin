@@ -329,7 +329,7 @@ cl_kernel CreateKernelFromSource(cl_program program, KernelInfo* ki) {
     kernel = clCreateKernel(program, ki->kernel_name.c_str(), NULL);
 
     if (kernel == NULL) {
-        LOG(ERROR) << "error: failed to create CL kernel.\n";
+        LOG(FATAL) << "error: failed to create CL kernel.\n";
         return NULL;
     }
 
