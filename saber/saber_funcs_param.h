@@ -1577,7 +1577,9 @@ struct LstmParam {
         , candidate_activity(Active_tanh)
         , with_peephole(true)
         , skip_input(false)
-
+        , skip_num(1)
+        , project_dim(-1)
+        , cell_dim(-1)
     {}
 
     LstmParam(opTensor* weight_in, opTensor* bias_in,
@@ -1591,7 +1593,11 @@ struct LstmParam {
               bool is_reverse_in = false,
               float dropout_param_in = 1.f,
               int num_direction_in = 1,
-              int numLayers_in = 1)
+              int numLayers_in = 1,
+              int skip_num_in = 1,
+              int project_dim_in = -1,
+              int cell_dim_in = -1
+                  )
         :
         weight_tensor(weight_in)
         , bias_tensor(bias_in)
@@ -1606,6 +1612,9 @@ struct LstmParam {
         , init_hidden_tensor(hidden_init_in)
         , with_peephole(with_peephole_in)
         , skip_input(skip_input_in)
+        , skip_num(skip_num_in)
+        , project_dim(project_dim_in)
+        , cell_dim(cell_dim_in)
     {}
 
 
@@ -1623,6 +1632,9 @@ struct LstmParam {
         skip_input = right.skip_input;
         is_reverse = right.is_reverse;
         init_hidden_tensor = right.init_hidden_tensor;
+        skip_num = right.skip_num;
+        project_dim=right.project_dim;
+        cell_dim=right.cell_dim;
         return *this;
     }
 
@@ -1641,11 +1653,18 @@ struct LstmParam {
         comp_eq = comp_eq && (candidate_activity == right.candidate_activity);
         comp_eq = comp_eq && (is_reverse = right.is_reverse);
         comp_eq = comp_eq && (init_hidden_tensor == right.init_hidden_tensor);
+        comp_eq = comp_eq && (skip_num == right.skip_num);
+        comp_eq = comp_eq && (project_dim == right.project_dim);
+        comp_eq = comp_eq && (cell_dim == right.cell_dim);
         return comp_eq;
     }
 
     inline const opTensor* weight() {
         return weight_tensor;
+    }
+
+    void set_weight(opTensor* weights_ptr) {
+        weight_tensor=weights_ptr;
     }
 
     inline const opTensor* bias() {
@@ -1670,6 +1689,10 @@ struct LstmParam {
     // and you should calc this information in fc layer before;
     // otherwise the input's memory layout should be total_seq_len * input_size;
     bool skip_input;
+
+    int skip_num;
+    int project_dim;
+    int cell_dim;
 private:
     opTensor* weight_tensor;
     opTensor* bias_tensor;

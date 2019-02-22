@@ -19,6 +19,163 @@
 namespace anakin {
 namespace saber {
 
+static const std::map<std::string, int> fix_times = {
+    {"miog_alphaab", 1},
+    {"miog_betac", 3},
+    {"miog_betac_alphaab", 3}
+};
+
+bool generateGemmOCL(const MIOpenGEMM::KernBlob& tgk,
+    const MIOpenGEMM::Geometry& tgg, int device_id,
+    std::vector<AMDKernelPtr>& vkptr) {
+
+    std::string kernel_clstring = tgk.kernstr;
+    tempfix::set_offsets_to_uint(kernel_clstring, fix_times[tgk.fname]);
+
+    KernelInfo kernelInfo;
+    kernelInfo.kernel_name     = tgk.fname;
+    std::string network_config = tgg.get_networkconfig_string();
+    size_t local_work_size     = tgk.local_work_size;
+    size_t global_work_size    = tgk.global_work_size;
+
+    kernelInfo.kernel_file  = kernel_clstring;
+    kernelInfo.l_wk         = {local_work_size, 1, 1};
+    kernelInfo.g_wk         = {global_work_size, 1, 1};
+    kernelInfo.comp_options = "";
+    kernelInfo.kernel_type  = SOURCE;
+
+    AMDKernelPtr kptr = CreateKernel(device_id, &kernelInfo);
+
+    if (!kptr.get()->isInit()) {
+        LOG(ERROR) << "Failed to create kernel";
+        return false;
+    }
+    vkptr.push_back(kptr);
+    return true;
+}
+
+bool launchGemmKernel(const float alpha, const float* A, const unsigned int A_offset,
+    const float beta, const float* B, const unsigned int B_offset,
+    float* C, const unsigned int C_offset, AMD_API::stream_t cm,
+    std::vector<AMDKernelPtr>& vkptr) {
+
+    int i = 0;
+    bool err = false;
+    amd_kernel_list list;
+
+    PtrDtype memObjects[3] =
+        {(PtrDtype)A, (PtrDtype)B, (PtrDtype)C};
+    cl_float floatObjects[2] = 
+        {(float)alpha, (float)beta};
+    cl_uint offsetObjects[3] =
+        {A_offset, B_offset, C_offset};
+
+    if (vkptr[0] == NULL || vkptr[0].get() == NULL) {
+        LOG(ERROR) << "Kernel is not exist";
+        return SaberInvalidValue;
+    }
+
+    if (vkptr.size() > 1) {
+        err = vkptr[i].get()->SetKernelArgs(
+              memObjects[2], offsetObjects[2], floatObjects[1]);
+
+        if (!err) {
+            LOG(ERROR) << "Fail to set kernel args :" << err;
+            return SaberInvalidValue;
+        }
+
+        list.push_back(vkptr[i++]);
+
+        err = vkptr[i].get()->SetKernelArgs(
+                  memObjects[0],
+                  offsetObjects[0],
+                  memObjects[1],
+                  offsetObjects[1],
+                  memObjects[2],
+                  offsetObjects[2],
+                  floatObjects[0]);
+    } else {
+        err = vkptr[i].get()->SetKernelArgs(
+                  memObjects[0],
+                  offsetObjects[0],
+                  memObjects[1],
+                  offsetObjects[1],
+                  memObjects[2],
+                  offsetObjects[2],
+                  floatObjects[0],
+                  floatObjects[1]);
+    }
+    if (!err) {
+        LOG(ERROR) << "Fail to set kernel args :" << err;
+        return SaberInvalidValue;
+    }
+
+    list.push_back(vkptr[i]);
+    err = LaunchKernel(cm, list);
+
+    if (!err) {
+        LOG(ERROR) << "Fail to set execution :" << err;
+        return SaberInvalidValue;
+    }
+
+    return true;
+}
+
+bool findGemmKernel(int M, int N, int K, bool Ta, bool Tb, bool Tc,
+    AMD_API::stream_t cm,
+    std::vector<AMDKernelPtr>& vkptr,
+    int device_id) {
+
+    KernelInfo kernelInfo;
+    MIOpenGEMM::Geometry tgg{};
+    bool miopengemm_verbose = false;
+    bool miopengemm_warnings = false;
+    int lda = 0, ldb = 0, ldc = 0;
+
+    if (!Ta && !Tb) {
+        lda = K;
+        ldb = N;
+        ldc = N;
+    } else if (!Ta && Tb) {
+        lda = K;
+        ldb = K;
+        ldc = N;
+    } else if (Ta && !Tb) {
+        lda = M;
+        ldb = N;
+        ldc = N;
+    } else {
+        lda = M;
+        ldb = K;
+        ldc = N;
+    }
+
+    Tensor<AMD> X, Y, Z;
+    X.reshape(Shape({1, 1, M, K}));
+    Y.reshape(Shape({1, 1, K, N}));
+    Z.reshape(Shape({1, 1, M, N}));
+
+    tgg = MIOpenGEMM::Geometry(false, Ta, Tb, Tc, lda, ldb, ldc, M, N, K, 0, 'f');
+    MIOpenGEMM::Solution soln = MIOpenGEMM::find(
+                                0.003f,
+                                cm,
+                                (PtrDtype)(X.data()),
+                                (PtrDtype)(Y.data()),
+                                (PtrDtype)(Z.mutable_data()),
+                                false,
+                                tgg,
+                                miopengemm_verbose,
+                                miopengemm_warnings);
+
+    int i = 0;
+    if (soln.v_tgks.size() == 2) {
+        generateGemmOCL(soln.v_tgks[i], tgg, device_id, vkptr);
+        i++;
+    }
+    generateGemmOCL(soln.v_tgks[i], tgg, device_id, vkptr);
+    return true;
+}
+
 bool findGenericGemm(bool fromSolver, std::vector<AMDKernelPtr>& vkptr,
                      const std::vector<Tensor<AMD>*>& inputs,
                      Tensor<AMD>*& output,

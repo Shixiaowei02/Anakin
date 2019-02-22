@@ -30,6 +30,20 @@ namespace anakin {
 namespace saber {
 typedef AMD_API::TPtr PtrDtype;
 
+bool generateGemmOCL(const MIOpenGEMM::KernBlob& tgk,
+    const MIOpenGEMM::Geometry& tgg, int device_id,
+    std::vector<AMDKernelPtr>& vkptr);
+
+bool launchGemmKernel(const float alpha, const float* A, const unsigned int A_offset,
+    const float beta, const float* B, const unsigned int B_offset,
+    float* C, const unsigned int C_offset, AMD_API::stream_t cm,
+    std::vector<AMDKernelPtr>& vkptr);
+
+bool findGemmKernel(int M, int N, int K, bool Ta, bool Tb, bool Tc,
+    AMD_API::stream_t cm,
+    std::vector<AMDKernelPtr>& vkptr,
+    int device_id);
+
 bool findGenericGemm(bool solver, std::vector<AMDKernelPtr>& kptr,
                      const std::vector<Tensor<AMD>*>& inputs,
                      Tensor<AMD>*& output,
