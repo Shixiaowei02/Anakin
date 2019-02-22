@@ -33,7 +33,7 @@ typedef std::list<AMDKernelPtr> amd_kernel_list;
 
 extern AMDKernelPtr CreateKernel(int device_id, KernelInfo* ki);
 extern bool LaunchKernel(AMDStream_t stream, amd_kernel_list kernels, bool sync = false);
-extern bool LaunchKernel(AMDStream_t stream, AMDKernelPtr kernel, bool sync = false);
+extern bool LaunchKernel(AMDStream_t stream, OCLKernel* kernel, bool sync = false);
 
 } // namespace saber
 } // namespace anakin

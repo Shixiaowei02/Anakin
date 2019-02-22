@@ -31,7 +31,7 @@ AMDKernelPtr CreateKernel(int device_id, KernelInfo* ki) {
     return gen_shared_ocl(new OCLKernel(context, device, ki));
 }
 
-bool LaunchKernel(AMDStream_t stream, AMDKernelPtr kernel, bool sync) {
+bool LaunchKernel(AMDStream_t stream, OCLKernel* kernel, bool sync) {
     float exec_time_ms = 0;
     cl_event event;
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << __func__ << " E";
@@ -59,7 +59,7 @@ bool LaunchKernel(AMDStream_t stream, AMDKernelPtr kernel, bool sync) {
 bool LaunchKernel(AMDStream_t stream, amd_kernel_list kernels, bool sync) {
     LOG_IF_S(INFO, ENABLE_AMD_DEBUG_LOG) << __func__;
     for (amd_kernel_list::iterator it = kernels.begin(); it != kernels.end(); it++) {
-        LaunchKernel(stream, *it, sync);
+        LaunchKernel(stream, it->get(), sync);
     }
     return true;
 }

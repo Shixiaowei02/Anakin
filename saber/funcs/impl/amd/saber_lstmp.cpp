@@ -200,9 +200,9 @@ static SaberStatus cal_lstm_batch(
     std::vector<size_t> l_wk({block_dim});
     std::vector<size_t> g_wk({grid_dim});
 
-    AMDKernelPtr it = lstm_kernels[first_iter];
+    AMDKernelPtr k_ptr = lstm_kernels[first_iter];
 
-    err = it->SetKernelArgs(
+    err = k_ptr->SetKernelArgs(
               (PtrDtype)temp_wx,
               (PtrDtype)b_i_in,
               (PtrDtype)b_f_in,
@@ -215,14 +215,14 @@ static SaberStatus cal_lstm_batch(
               (int)hidden_size,
               (int)emit_word_id_size,
               (PtrDtype)hout);
-    err = err && (it->SetLocalWorkSize(l_wk));
-    err = err && (it->SetGlobalWorkSize(g_wk));
+    err = err && (k_ptr->SetLocalWorkSize(l_wk));
+    err = err && (k_ptr->SetGlobalWorkSize(g_wk));
 
     if (!err) {
         LOG(ERROR) << "Fail to set args";
         return SaberInvalidValue;
     }
-    err = LaunchKernel(cm, it);
+    err = LaunchKernel(cm, k_ptr.get());
     if (!err) {
         LOG(ERROR) << "Fail to set execution";
         return SaberInvalidValue;
@@ -241,17 +241,17 @@ static SaberStatus vTanh(
     int localSize  = 256;
     std::vector<size_t> l_wk({localSize});
     std::vector<size_t> g_wk({(globalSize + localSize - 1) / localSize * localSize});
-    AMDKernelPtr it = act_kernels[Active_tanh];
-    int err = it->SetKernelArgs(
+    AMDKernelPtr k_ptr = act_kernels[Active_tanh];
+    int err = k_ptr->SetKernelArgs(
               (PtrDtype)data,
               (int)count);
-    err = err && (it->SetLocalWorkSize(l_wk));
-    err = err && (it->SetGlobalWorkSize(g_wk));
+    err = err && (k_ptr->SetLocalWorkSize(l_wk));
+    err = err && (k_ptr->SetGlobalWorkSize(g_wk));
     if (!err) {
         LOG(ERROR) << "Fail to set args";
         return SaberInvalidValue;
     }
-    err = LaunchKernel(cm, act_kernels[Active_tanh]);
+    err = LaunchKernel(cm, k_ptr.get());
     if (!err) {
         LOG(ERROR) << "Fail to set execution";
         return SaberInvalidValue;
