@@ -27,6 +27,15 @@ namespace saber{
 const float eps = 1e-6f;
 
 /**
+ * tensor_reorder
+ * @tparam TargetType
+ * @param input
+ * @param output
+ */
+template <typename TargetType>
+void tensor_reorder(Tensor<TargetType>& input, Tensor<TargetType>& output);
+
+/**
 * \brief reorder reorder tensors from src layout to dst layout
 * \param src  source tensor reference
 * \param dst  destination tensor reference
@@ -94,6 +103,9 @@ double tensor_mean_value_valid(Tensor<TargetType>& tensor, typename Tensor<Targe
 template <typename Dtype >
 void tensor_cmp_host(const Dtype* src1, const Dtype* src2, int size, double& max_ratio, double& max_diff);
 
+template <typename Dtype>
+void tensor_cmp_host_mlu(const Dtype* correct, const Dtype* sample, \
+     int size, double& diff);
 #ifdef USE_CUDA
 
 /// This transform helper is only used to transform inputs or outputs,
