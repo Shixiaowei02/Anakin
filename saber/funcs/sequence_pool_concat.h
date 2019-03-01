@@ -65,13 +65,16 @@ public:
     virtual SaberStatus compute_output_shape(const Input_v& input,
             Output_v &output, Param_t& param) override {
         int xdim = input[0]->width();
-        int n_total = input[0]->num();
         auto offset = input[0]->get_seq_offset();
-        if (offset.size() > 0 && offset[0].size() > 0) {
-            xdim /= offset[0].size();
+        int slot_num = param.slot_num;
+        // batch need to check the max batch
+        int batch = 0;
+        if (offset.size() >= 1 && offset[0].size() > 1) {
+            batch = (offset[0].size() - 1) / slot_num;
+        } else {
+            batch = input[0]->num();
         }
-
-        Shape output_shape({1, input[0]->num() * input[0]->width(), 1, 1}, Layout_NCHW);
+        Shape output_shape({batch, slot_num * input[0]->width(), 1, 1}, Layout_NCHW);
         return output[0]->set_shape(output_shape);
     }
 

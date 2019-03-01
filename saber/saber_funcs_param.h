@@ -3055,21 +3055,25 @@ struct SequencePoolConcatParam{
     SequencePoolConcatParam()
             : sequence_pool_param()
             , concat_param()
+            , slot_num{0}
     {}
     SequencePoolConcatParam(SequencePoolParam<TargetType> sequence_pool_param_in,
-            ConcatParam<TargetType> concat_param)
+            ConcatParam<TargetType> concat_param, int slot_num_in)
         : sequence_pool_param(sequence_pool_param_in)
         , concat_param(concat_param)
+        , slot_num(slot_num_in)
     {}
 
     SequencePoolConcatParam(const SequencePoolConcatParam& right)
             : sequence_pool_param(right.sequence_pool_param)
             , concat_param(right.concat_param)
+            , slot_num(right.slot_num)
     {}
 
     SequencePoolConcatParam& operator=(const SequencePoolConcatParam& right) {
         sequence_pool_param = right.sequence_pool_param;
         concat_param = right.concat_param;
+        slot_num = right.slot_num;
         return *this;
     }
 
@@ -3077,11 +3081,13 @@ struct SequencePoolConcatParam{
         bool comp_eq = true;
         comp_eq &= (sequence_pool_param == right.sequence_pool_param);
         comp_eq &= (concat_param == right.concat_param);
+        comp_eq &= (slot_num == right.slot_num);
         return comp_eq;
     }
 
     SequencePoolParam<TargetType> sequence_pool_param;
     ConcatParam<TargetType> concat_param;
+    int slot_num;
 };
 
 }

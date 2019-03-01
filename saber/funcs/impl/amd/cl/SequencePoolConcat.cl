@@ -10,14 +10,14 @@ __kernel void sequence_pool_sum_concat(
     const int tid = get_local_id(0);
     const int gid = get_global_id(0);
     const int n_idx = gid / xdim;
-    int batch;
+    int feature_num;
     int x_idx = gid % xdim;
     if (n_idx < n_total) {
-        batch = offset[n_idx + 1] - offset[n_idx];
+        feature_num = offset[n_idx + 1] - offset[n_idx];
         global float* out_data = output_data + n_idx * xdim;
-        global const float* in_data = input_data + n_idx * batch * xdim;
+        global const float* in_data = input_data + offset[n_idx] * xdim;
         float res = 0.f;
-        for (int i = 0; i < batch; ++i) {
+        for (int i = 0; i < feature_num; ++i) {
             res += in_data[x_idx];
             in_data += xdim;
         }

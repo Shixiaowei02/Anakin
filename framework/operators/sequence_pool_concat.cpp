@@ -33,9 +33,15 @@ Status SequencePoolConcatHelper<Ttype, Ptype>::InitParam() {
     type_map.insert(std::make_pair("LAST", anakin::saber::Sequence_pool_last));
     type_map.insert(std::make_pair("FIRST", anakin::saber::Sequence_pool_first));
     type_map.insert(std::make_pair("MAX", anakin::saber::Sequence_pool_max));
+    int slot_num = 1;
+    if (CHECK_PARAMETER(slot_num)) {
+        slot_num = GET_PARAMETER(int, slot_num);
+    } else {
+        LOG(FATAL) << "not found slot num param!!!!";
+    }
     saber::SequencePoolParam<Ttype> seq_param(type_map[pooltype]);
     saber::ConcatParam<Ttype> concat_param(0);
-    saber::SequencePoolConcatParam<Ttype> sequence_pool_param(seq_param, concat_param);
+    saber::SequencePoolConcatParam<Ttype> sequence_pool_param(seq_param, concat_param, slot_num);
     _param_sequence_pool = sequence_pool_param;
     return Status::OK();
 }
@@ -64,11 +70,11 @@ template class SequencePoolConcatHelper<NV, Precision::INT8>;
 ANAKIN_REGISTER_OP_HELPER(SequencePoolConcat, SequencePoolConcatHelper, NV, Precision::FP32);
 #endif
 
-//#ifdef AMD_GPU
+#ifdef AMD_GPU
 INSTANCE_SEQUENCE_POOL_CONCAT(AMD, Precision::FP32);
 template class SequencePoolConcatHelper<AMD, Precision::FP32>;
 ANAKIN_REGISTER_OP_HELPER(SequencePoolConcat, SequencePoolConcatHelper, AMD, Precision::FP32);
-//#endif
+#endif
 
 //#ifdef USE_ARM_PLACE
 //INSTANCE_SEQUENCE_POOL_CONCAT(ARM, Precision::FP32);
@@ -78,13 +84,13 @@ ANAKIN_REGISTER_OP_HELPER(SequencePoolConcat, SequencePoolConcatHelper, AMD, Pre
 //ANAKIN_REGISTER_OP_HELPER(SequencePoolConcat, SequencePoolConcatHelper, ARM, Precision::FP32);
 //#endif
 
-//#ifdef USE_X86_PLACE
-//INSTANCE_SEQUENCE_POOL_CONCAT(X86, Precision::FP32);
-//template class SequencePoolConcatHelper<X86, Precision::FP32>;
-//template class SequencePoolConcatHelper<X86, Precision::FP16>;
-//template class SequencePoolConcatHelper<X86, Precision::INT8>;
-//ANAKIN_REGISTER_OP_HELPER(SequencePoolConcat, SequencePoolConcatHelper, X86, Precision::FP32);
-//#endif
+#ifdef USE_X86_PLACE
+INSTANCE_SEQUENCE_POOL_CONCAT(X86, Precision::FP32);
+template class SequencePoolConcatHelper<X86, Precision::FP32>;
+template class SequencePoolConcatHelper<X86, Precision::FP16>;
+template class SequencePoolConcatHelper<X86, Precision::INT8>;
+ANAKIN_REGISTER_OP_HELPER(SequencePoolConcat, SequencePoolConcatHelper, X86, Precision::FP32);
+#endif
 
 //! register op
 ANAKIN_REGISTER_OP(SequencePoolConcat)

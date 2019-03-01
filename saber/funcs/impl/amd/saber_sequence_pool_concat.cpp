@@ -87,12 +87,15 @@ SaberStatus SaberSequencePoolConcat<AMD, OpDtype>::dispatch(
 
     const int* offset_data  = (const int*)_offset_buffer.get_data();
 
-    int n_total = offset.size() - 1;
+    int slot_num = param.slot_num;
+    int batch = (offset.size() - 1) / slot_num;
     int xdim = outputs[0]->valid_size();
-    CHECK_EQ((xdim % n_total), 0) << "some data is wrong!!!";
-    xdim /= n_total;
+    CHECK_EQ((xdim % slot_num), 0) << "some data is wrong!!!" << xdim << " " << slot_num;
+    CHECK_GE(batch, 1);
+    xdim /= slot_num;
+    xdim /= batch;
 
-    int count = n_total * xdim;
+    int count = slot_num * batch * xdim;
 
     std::vector<size_t> l_wk({256});
     std::vector<size_t> g_wk({(count + l_wk[0] - 1) / l_wk[0] * l_wk[0]});
@@ -103,7 +106,7 @@ SaberStatus SaberSequencePoolConcat<AMD, OpDtype>::dispatch(
               (PtrDtype)bottom_data,
               (PtrDtype)top_data,
               (PtrDtype)offset_data,
-              (int)n_total,
+              (int)(slot_num * batch),
               (int)xdim);
     err = err && (it->get()->SetLocalWorkSize(l_wk));
     err = err && (it->get()->SetGlobalWorkSize(g_wk));
